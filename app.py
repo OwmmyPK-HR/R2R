@@ -10,9 +10,22 @@ from fpdf.enums import Align
 
 # --- การกำหนดค่า ---
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'a8f5f167f44f4964e6c998dee827110c'  # Secure SECRET_KEY for production
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a8f5f167f44f4964e6c998dee827110c')  # Use environment variable in production
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+
+# สร้างโฟลเดอร์ uploads หากไม่มี
+if not os.path.exists(app.config['UPLOAD_FOLDER']):
+    os.makedirs(app.config['UPLOAD_FOLDER'])
+
+# Database configuration - ใช้ environment variable สำหรับ production
+database_url = os.environ.get('DATABASE_URL')
+if database_url:
+    # สำหรับ PostgreSQL บน Heroku หรือแพลตฟอร์มอื่น
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url.replace('postgres://', 'postgresql://')
+else:
+    # สำหรับการทดสอบ local
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max file size
 
@@ -1006,4 +1019,22 @@ if __name__ == '__main__':
         os.makedirs('static/fonts')
         print("Static fonts folder created. Please add Sarabun-Regular.ttf and Sarabun-Bold.ttf")
 
-    app.run(debug=True, host='127.0.0.1', port=5000)  # ปรับ debug เป็น False สำหรับ production
+if __name__ == '__main__':
+    # สำหรับการพัฒนา local
+    app.run(debug=True, host='127.0.0.1', port=5000)
+else:
+    # สำหรับ production deployment
+    with app.app_context():
+        db.create_all()
+        # Initialize default settings if needed
+        try:
+            existing_setting = Settings.query.filter_by(key='header_note').first()
+            if not existing_setting:
+                default_setting = Settings(
+                    key='header_note', 
+                    value='(สำหรับบทความวิจัยที่ตีพิมพ์เผยแพร่หลังวันที่ 26 กันยายน พ.ศ. 2566)'
+                )
+                db.session.add(default_setting)
+                db.session.commit()
+        except Exception as e:
+            db.session.rollback()

@@ -1,6 +1,6 @@
-Flask
-Flask-SQLAlchemy
-fpdf2
-gunicorn
-psycopg2-binary
-python3
+Flask==2.3.3
+Flask-SQLAlchemy==3.0.5
+fpdf2==2.7.6
+gunicorn==21.2.0
+Werkzeug==2.3.7
+psycopg2-binary==2.9.7
