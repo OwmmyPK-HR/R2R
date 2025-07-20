@@ -101,7 +101,7 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
             creativeFinalAmountOutput.value = '';
         }
     }
-    // 4. ฟังก์ชันใหม่! สำหรับ "อัปเดตเงินฐาน" จาก "ผลรวม" ของ Checkbox ทั้งหมด
+    // 4. ฟังก์ชัน สำหรับ "อัปเดตเงินฐาน" จาก "ผลรวม" ของ Checkbox ทั้งหมด
     function updateCreativeBaseAmount() {
         let totalAmount = 0;
         // วนลูปดู Checkbox ทุกอัน
@@ -155,9 +155,107 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
         });
     }
     
+    // --- ตรวจสอบเพดานตัวเลข 5,000 บาทสำหรับ Page charge (3.1) ---
+    const pageChargeAmountInput = document.getElementById('page_charge_amount');
+    if (pageChargeAmountInput) {
+        pageChargeAmountInput.addEventListener('input', function() {
+            const value = parseFloat(this.value);
+            if (value > 5000) {
+                alert('จำนวนเงินต้องไม่เกิน 5,000 บาท ตามเพดานที่กำหนด');
+                this.value = 5000; // ตั้งค่าเป็น 5000 อัตโนมัติ
+            }
+        });
+        
+        // ตรวจสอบเมื่อผู้ใช้พิมพ์เสร็จแล้ว (blur)
+        pageChargeAmountInput.addEventListener('blur', function() {
+            const value = parseFloat(this.value);
+            if (value > 5000) {
+                alert('จำนวนเงินต้องไม่เกิน 5,000 บาท ตามเพดานที่กำหนด');
+                this.value = 5000;
+            }
+        });
+    }
+    
+    // --- ตรวจสอบเพดานตัวเลข 10,000 บาทสำหรับ International Page charge (4.1) ---
+    const chargeIntAmountInput = document.getElementById('charge_int_amount');
+    if (chargeIntAmountInput) {
+        chargeIntAmountInput.addEventListener('input', function() {
+            const value = parseFloat(this.value);
+            if (value > 10000) {
+                alert('จำนวนเงินต้องไม่เกิน 10,000 บาท ตามเพดานที่กำหนด');
+                this.value = 10000; // ตั้งค่าเป็น 10000 อัตโนมัติ
+            }
+        });
+        
+        // ตรวจสอบเมื่อผู้ใช้พิมพ์เสร็จแล้ว (blur)
+        chargeIntAmountInput.addEventListener('blur', function() {
+            const value = parseFloat(this.value);
+            if (value > 10000) {
+                alert('จำนวนเงินต้องไม่เกิน 10,000 บาท ตามเพดานที่กำหนด');
+                this.value = 10000;
+            }
+        });
+    }
+    
     // ==========================================================
     // === ส่วนที่ 3: ระบบ Popup ทั้งหมด (ส่งฟอร์ม, Login)  ===
     // ==========================================================
+
+    // ฟังก์ชันตรวจสอบการติ๊กช่องสี่เหลี่ยมในแต่ละข้อ
+    function validateCheckboxSections() {
+        const sections = [
+            {
+                name: '1. คุณสมบัติของผู้ขอรับการสนับสนุนการตีพิมพบทความวิจัย',
+                selectors: ['#qual_1_1', '#qual_1_2', '#qual_1_3']
+            },
+            {
+                name: '2. ขอบเขตของบทความวิจัยหรืองานสร้างสรรค์ที่ขอรับการสนับสนุนค่าสมนาคุณ',
+                selectors: ['#scope_2_1', '#scope_2_2']
+            },
+            {
+                name: '3. หลักเกณฑ์การจ่ายเงิน และรางวัลสนับสนุนการตีพิมพ์บทความวิจัย กรณีตีพิมพ์ในวารสารระดับชาติ',
+                selectors: ['#payment_3_1', '#payment_3_2', '#payment_3_3']
+            },
+            {
+                name: '4. หลักเกณฑ์การจ่ายเงิน และรางวัลสนับสนุนการตีพิมพ์บทความวิจัย กรณีตีพิมพ์ในวารสารระดับนานาชาติ',
+                selectors: ['#charge_int_checkbox', '#remuneration_int_checkbox', '#share_int_checkbox']
+            },
+            {
+                name: '5. กรณีตีพิมพ์ในวารสาร ประเภทบทความวิจัยที่ถูกคัดเลือกมาจากการประชุมวิชาการและนำมาตีพิมพ์ลงใน วารสาร (Journal) และเป็นฉบับพิเศษ (Special Issue)',
+                selectors: ['#special_nat_checkbox', '#special_nat_share_checkbox', '#special_int_checkbox', '#special_int_share_checkbox']
+            },
+            {
+                name: '6. ค่าสมนาคุณงานสร้างสรรค์ที่เผยแพร่ แบ่งเป็น 5 ระดับ',
+                selectors: ['#creative_level_asean', '#creative_level_inter_coop', '#creative_level_national', '#creative_level_institutional', '#creative_level_public', '#creative_share_checkbox']
+            },
+            {
+                name: '7. หลักฐานประกอบการเสนอขอรับการสนับสนุน',
+                selectors: ['input[name="evidence_page_charge_check"]', 'input[name="evidence_full_paper_check"]', 'input[name="evidence_consent_letter_check"]', 'input[name="evidence_quartile_check"]', 'input[name="evidence_tci_check"]', 'input[name="evidence_editorial_board_check"]', 'input[name="evidence_exhibition_check"]', 'input[name="evidence_proof_check"]', 'input[name="evidence_nrms_check"]', 'input[name="evidence_other_check"]']
+            }
+        ];
+
+        for (let i = 0; i < sections.length; i++) {
+            const section = sections[i];
+            let hasChecked = false;
+            
+            for (let j = 0; j < section.selectors.length; j++) {
+                const checkbox = document.querySelector(section.selectors[j]);
+                if (checkbox && checkbox.checked) {
+                    hasChecked = true;
+                    break;
+                }
+            }
+            
+            if (!hasChecked) {
+                return {
+                    isValid: false,
+                    message: `กรุณาเลือกอย่างน้อย 1 ข้อในส่วน "${section.name}" ก่อนส่งแบบฟอร์ม`
+                };
+            }
+        }
+        
+        return { isValid: true };
+    }
 
     // --- จัดการการส่งฟอร์มหลัก (Main Form Submission) ---
     const mainForm = document.getElementById('main-form');
@@ -171,6 +269,17 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
 
         mainForm.addEventListener('submit', function(event) {
             event.preventDefault();
+            
+            // ตรวจสอบการติ๊กช่องสี่เหลี่ยมในแต่ละข้อ
+            const validationResult = validateCheckboxSections();
+            if (!validationResult.isValid) {
+                popupContent.classList.add('error');
+                popupTitle.textContent = 'กรุณาตรวจสอบข้อมูล';
+                popupMessage.textContent = validationResult.message;
+                successPopup.style.display = 'flex';
+                return;
+            }
+            
             submitButton.textContent = 'กำลังส่งข้อมูล...';
             submitButton.disabled = true;
             

@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, flash
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 from werkzeug.utils import secure_filename
 from fpdf import FPDF
 from datetime import datetime
@@ -182,7 +183,7 @@ class PDF(FPDF):
         # ไปที่มุมบนขวา
         self.set_y(5)
         # สร้างเลขที่เอกสารแบบอัตโนมัติ โดยใช้ submission_id จาก PDF instance
-        document_number = f"IRD_06/{self.submission_id:05d}"  # Format: IRD_06/00001, IRD_06/00002, etc.
+        document_number = f"ฝวน IRD_06/{self.submission_id:05d}"  # Format: IRD_06/00001, IRD_06/00002, etc.
         self.cell(0, 10, document_number, 0, 0, 'R')
         self.ln(5) # เลื่อนลงมาเล็กน้อย
         # --- 2. เพิ่มหัวข้อเอกสาร (จัดกึ่งกลาง) ---
@@ -267,6 +268,17 @@ def index():
             if affiliation == 'อื่นๆ':
                 affiliation = request.form.get('affiliationOther', '')
 
+            # ตรวจสอบและจำกัดค่า page_charge_amount ให้ไม่เกิน 5,000 บาท
+            page_charge_amount = request.form.get('page_charge_amount')
+            if page_charge_amount:
+                try:
+                    page_charge_value = float(page_charge_amount)
+                    if page_charge_value > 5000:
+                        page_charge_amount = '5000'  # จำกัดให้ไม่เกิน 5,000
+                        flash('ค่าธรรมเนียมการตีพิมพ์ถูกปรับเป็น 5,000 บาท ตามเพดานที่กำหนด', 'warning')
+                except ValueError:
+                    pass  # ถ้าแปลงไม่ได้ ให้เก็บค่าเดิม
+
             new_submission = Submission(
                 # Part 1
                 full_name=request.form.get('fullName'),
@@ -288,7 +300,7 @@ def index():
                 scope_2_1=get_bool('scope_2_1'),
                 scope_2_2=get_bool('scope_2_2'),
                 payment_3_1=get_bool('payment_3_1'),
-                page_charge_amount=request.form.get('page_charge_amount'),
+                page_charge_amount=page_charge_amount,
                 payment_3_2=get_bool('payment_3_2'),
                 payment_3_3=get_bool('payment_3_3'),
                 num_institutes_3_3=request.form.get('num_institutes_3_3'),
@@ -407,15 +419,33 @@ def admin():
         return redirect(url_for('index'))
     
     page = request.args.get('page', 1, type=int)
+    search = request.args.get('search', '', type=str)
+    sort_order = request.args.get('sort', 'asc', type=str)  # asc หรือ desc
     
-    # vvv แก้ไขบรรทัดนี้เพื่อเปลี่ยนการเรียงลำดับ vvv
-    pagination = Submission.query.order_by(Submission.id.asc()).paginate(
+    # สร้าง query พื้นฐาน
+    query = Submission.query
+    
+    # เพิ่มการค้นหาตามชื่อ
+    if search:
+        query = query.filter(Submission.full_name.like(f'%{search}%'))
+    
+    # เพิ่มการเรียงลำดับ
+    if sort_order == 'desc':
+        query = query.order_by(Submission.id.desc())
+    else:
+        query = query.order_by(Submission.id.asc())
+    
+    pagination = query.paginate(
         page=page, per_page=20, error_out=False
     )
     
     submissions = pagination.items
     
-    return render_template('admin.html', submissions=submissions, pagination=pagination)
+    return render_template('admin.html', 
+                         submissions=submissions, 
+                         pagination=pagination,
+                         search=search,
+                         sort_order=sort_order)
 
 @app.route('/download_pdf/<int:submission_id>')
 def download_pdf(submission_id):
@@ -902,6 +932,7 @@ def delete_submission(submission_id):
         return redirect(url_for('index'))
 
     submission = Submission.query.get_or_404(submission_id)
+    deleted_id = submission.id
 
     # ลิสต์ของ field ทั้งหมดที่เก็บชื่อไฟล์อัปโหลด
     file_fields_to_delete = [
@@ -910,24 +941,63 @@ def delete_submission(submission_id):
         'evidence_tci_upload', 'evidence_editorial_board_upload',
         'evidence_exhibition_upload', 'evidence_proof_upload',
         'evidence_nrms_upload', 'evidence_other_upload',
-        'applicant_signature_upload', 'dean_signature_upload',
         'consent_evidence_pdf'
     ]
 
     # ทำการลบไฟล์จริงๆ ออกจากโฟลเดอร์ uploads
     for field in file_fields_to_delete:
-        filename = getattr(submission, field)
-        if filename:
-            try:
-                os.remove(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            except OSError as e:
-                print(f"Error deleting file {filename}: {e}")
+        if hasattr(submission, field):
+            filename = getattr(submission, field)
+            if filename:
+                try:
+                    os.remove(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                except OSError as e:
+                    print(f"Error deleting file {filename}: {e}")
+        else:
+            print(f"Warning: Field '{field}' does not exist in Submission model")
 
     # ลบข้อมูลออกจากฐานข้อมูล
     db.session.delete(submission)
     db.session.commit()
 
-    flash(f'รายการ ID {submission.id} ได้ถูกลบเรียบร้อยแล้ว', 'success') # ส่งข้อความแจ้งเตือน
+    # หาข้อมูลทั้งหมดที่มี ID มากกว่า ID ที่ถูกลบ และจัดเรียงตาม ID
+    submissions_to_update = Submission.query.filter(Submission.id > deleted_id).order_by(Submission.id).all()
+    
+    # อัปเดต ID ของข้อมูลที่เหลือให้เรียงต่อกัน โดยใช้ raw SQL
+    for submission in submissions_to_update:
+        old_id = submission.id
+        new_id = old_id - 1
+        
+        try:
+            # ใช้ text() สำหรับ raw SQL ใน SQLAlchemy 2.x
+            db.session.execute(
+                text("UPDATE submission SET id = :new_id WHERE id = :old_id"),
+                {"new_id": new_id, "old_id": old_id}
+            )
+        except Exception as e:
+            print(f"Error updating ID from {old_id} to {new_id}: {e}")
+            db.session.rollback()
+            flash('เกิดข้อผิดพลาดในการจัดเรียง ID ใหม่', 'error')
+            return redirect(url_for('admin'))
+    
+    # Commit การเปลี่ยนแปลง
+    try:
+        db.session.commit()
+        
+        # รีเซ็ต AUTO_INCREMENT สำหรับ SQLite
+        max_id_result = db.session.execute(text("SELECT MAX(id) FROM submission")).fetchone()
+        max_id = max_id_result[0] if max_id_result[0] else 0
+        
+        # รีเซ็ต sequence สำหรับ SQLite
+        db.session.execute(text(f"UPDATE sqlite_sequence SET seq = {max_id} WHERE name = 'submission'"))
+        db.session.commit()
+        
+        flash('ลบข้อมูลเรียบร้อยแล้ว', 'success')
+    except Exception as e:
+        print(f"Error during final commit or auto increment reset: {e}")
+        db.session.rollback()
+        flash('เกิดข้อผิดพลาดในการลบข้อมูล', 'error')
+
     return redirect(url_for('admin'))
 
 # เพิ่ม Routes ใหม่หลังจาก @app.route('/admin')

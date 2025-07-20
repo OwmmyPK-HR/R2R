@@ -20,11 +20,44 @@
             </div>
         </div>
         
+        <!-- ช่องค้นหาและปุ่มเรียงลำดับ -->
+        <div class="search-and-filter-section">
+            <form method="GET" action="{{ url_for('admin') }}" class="search-form">
+                <div class="search-group">
+                    <input type="text" 
+                           name="search" 
+                           value="{{ search }}" 
+                           placeholder="ค้นหาชื่อผู้ส่ง..."
+                           class="search-input">
+                    <button type="submit" class="search-btn">
+                        <i class="fas fa-search"></i> ค้นหา
+                    </button>
+                    {% if search %}
+                    <a href="{{ url_for('admin') }}" class="clear-btn">
+                        <i class="fas fa-times"></i> ล้าง
+                    </a>
+                    {% endif %}
+                </div>
+                <input type="hidden" name="sort" value="{{ sort_order }}">
+            </form>            
+            <div class="sort-buttons">
+                <a href="{{ url_for('admin', search=search, sort='asc') }}" 
+                   class="sort-btn {{ 'active' if sort_order == 'asc' else '' }}">
+                    <i class="fas fa-sort-numeric-up"></i> เก่า-ใหม่
+                </a>
+                <a href="{{ url_for('admin', search=search, sort='desc') }}" 
+                   class="sort-btn {{ 'active' if sort_order == 'desc' else '' }}">
+                    <i class="fas fa-sort-numeric-down"></i> ใหม่-เก่า
+                </a>
+            </div>
+        </div>
+        
         <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
                         <th><i class="fas fa-hashtag"></i> ID</th>
+                        <th><i class="fas fa-file-alt"></i> เลขฝวน</th>
                         <th><i class="fas fa-user"></i> ชื่อผู้ส่ง</th>
                         <th><i class="fas fa-calendar-alt"></i> วันที่ส่ง</th>
                         <th><i class="fas fa-cogs"></i> การจัดการ</th>
@@ -34,6 +67,7 @@
                     {% for s in submissions %}
                     <tr>
                         <td data-label="ID">{{ s.id }}</td>
+                        <td data-label="เลขฝวน">ฝวน IRD_06/{{ "%05d"|format(s.id) }}</td>
                         <td data-label="ชื่อผู้ส่ง">{{ s.full_name or '-' }}</td>
                         <td data-label="วันที่ส่ง">{{ s.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
                         <td data-label="การจัดการ">
@@ -43,11 +77,14 @@
                             <a href="{{ url_for('download_pdf', submission_id=s.id) }}" class="action-btn generate-pdf-btn">
                                 <i class="fas fa-file-pdf"></i> ดาวน์โหลด PDF
                             </a>
+                            <button class="action-btn delete-btn" data-id="{{ s.id }}" data-ref="ฝวน IRD_06/{{ '%05d'|format(s.id) }}" onclick="confirmDelete(this)">
+                                <i class="fas fa-trash"></i> ลบ
+                            </button>
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="4">
+                        <td colspan="5">
                             <i class="fas fa-inbox"></i> ยังไม่มีข้อมูลที่ส่งเข้ามา
                         </td>
                     </tr>
@@ -60,7 +97,7 @@
         {% if pagination.pages > 1 %}
         <div class="pagination">
             {% if pagination.has_prev %}
-                <a href="{{ url_for('admin', page=pagination.prev_num) }}" class="page-link">
+                <a href="{{ url_for('admin', page=pagination.prev_num, search=search, sort=sort_order) }}" class="page-link">
                     <i class="fas fa-chevron-left"></i> ก่อนหน้า
                 </a>
             {% else %}
@@ -72,7 +109,7 @@
             {% for page_num in pagination.iter_pages() %}
                 {% if page_num %}
                     {% if page_num != pagination.page %}
-                        <a href="{{ url_for('admin', page=page_num) }}" class="page-link">{{ page_num }}</a>
+                        <a href="{{ url_for('admin', page=page_num, search=search, sort=sort_order) }}" class="page-link">{{ page_num }}</a>
                     {% else %}
                         <span class="page-link active">{{ page_num }}</span>
                     {% endif %}
@@ -82,7 +119,7 @@
             {% endfor %}
 
             {% if pagination.has_next %}
-                <a href="{{ url_for('admin', page=pagination.next_num) }}" class="page-link">
+                <a href="{{ url_for('admin', page=pagination.next_num, search=search, sort=sort_order) }}" class="page-link">
                     ถัดไป <i class="fas fa-chevron-right"></i>
                 </a>
             {% else %}
@@ -105,6 +142,60 @@
         </div>
     </div>
 
+    <!-- Modal สำหรับยืนยันการลบ -->
+    <div id="delete-modal" class="modal-container">
+        <div class="modal-content">
+            <h2><i class="fas fa-exclamation-triangle" style="color: #f44336;"></i> ยืนยันการลบข้อมูล</h2>
+            <div class="modal-body">
+                <p>คุณต้องการลบข้อมูล <strong id="delete-ref"></strong> หรือไม่?</p>
+                <p style="color: #f44336; font-size: 0.9em;">
+                    <i class="fas fa-warning"></i> 
+                    การลบจะทำให้เลขฝวนถัดไปเลื่อนขึ้นมาแทนที่ และไม่สามารถกู้คืนได้
+                </p>
+                <div style="margin-top: 20px; text-align: center;">
+                    <button id="confirm-delete-btn" class="submit-btn" style="background-color: #f44336; margin-right: 10px;">
+                        <i class="fas fa-trash"></i> ยืนยันลบ
+                    </button>
+                    <button id="cancel-delete-btn" class="submit-btn" style="background-color: #6c757d;">
+                        <i class="fas fa-times"></i> ยกเลิก
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ฟังก์ชันสำหรับยืนยันการลบ
+        function confirmDelete(button) {
+            const submissionId = button.getAttribute('data-id');
+            const refNumber = button.getAttribute('data-ref');
+            
+            document.getElementById('delete-ref').textContent = refNumber;
+            document.getElementById('delete-modal').style.display = 'flex';
+            
+            // ตั้งค่า event listener สำหรับปุ่มยืนยัน
+            document.getElementById('confirm-delete-btn').onclick = function() {
+                // สร้าง form สำหรับส่ง POST request
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/delete/' + submissionId;
+                document.body.appendChild(form);
+                form.submit();
+            };
+            
+            // ตั้งค่า event listener สำหรับปุ่มยกเลิก
+            document.getElementById('cancel-delete-btn').onclick = function() {
+                document.getElementById('delete-modal').style.display = 'none';
+            };
+        }
+        
+        // ปิด modal เมื่อคลิกพื้นหลัง
+        document.getElementById('delete-modal').onclick = function(e) {
+            if (e.target === this) {
+                this.style.display = 'none';
+            }
+        };
+    </script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>
