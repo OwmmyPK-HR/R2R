@@ -1,2 +1,1 @@
-pdf.set_font('Sarabun', 'B', 10)
-    pdf.cell(0, 6, "1. คุณสมบัติของผู้ขอรับการสนับสนุนฯ", 0, 1)
+Publication_IRD

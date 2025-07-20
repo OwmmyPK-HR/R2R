@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>การตั้งค่าระบบ</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+<body>
+    <header class="header-bar">
+        <h1 class="header-title"><i class="fas fa-cog"></i> การตั้งค่าระบบ</h1>
+    </header>
+
+    <div class="container admin-container">
+        <div class="admin-header">
+            <h2><i class="fas fa-cog"></i> การตั้งค่าระบบ</h2>
+            <div>
+                <a href="{{ url_for('admin') }}" class="action-btn"><i class="fas fa-arrow-left"></i> กลับหน้า Admin</a>
+                <a href="{{ url_for('logout') }}" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="post">
+            <fieldset>
+                <legend>การตั้งค่าหัวข้อแบบฟอร์ม</legend>
+                <div class="form-group">
+                    <label for="header_note">หมายเหตุในหัวข้อแบบฟอร์ม:</label>
+                    <textarea id="header_note" name="header_note" rows="3" required>{{ current_note }}</textarea>
+                    <small style="color: #6c757d; font-style: italic;">
+                        ข้อความนี้จะปรากฏในหัวข้อแบบฟอร์มและในไฟล์ PDF ที่สร้าง
+                    </small>
+                </div>
+                <button type="submit" class="submit-btn">
+                    <i class="fas fa-save"></i> บันทึกการตั้งค่า
+                </button>
+            </fieldset>
+        </form>
+    </div>
+</body>
+</html>

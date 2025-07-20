@@ -10,13 +10,20 @@ from fpdf.enums import Align
 
 # --- การกำหนดค่า ---
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'R2R' # ควรเปลี่ยนเป็นคีย์ที่ซับซ้อน
+app.config['SECRET_KEY'] = 'a8f5f167f44f4964e6c998dee827110c'  # Secure SECRET_KEY for production
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max file size
+
+# กำหนดประเภทไฟล์ที่อนุญาต
+ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 db = SQLAlchemy(app)
-ADMIN_PASSWORD = "1" # รหัสผ่านสำหรับ Admin
+ADMIN_PASSWORD = "Publication_IRD" # รหัสผ่านสำหรับ Admin
 
 # --- โมเดลฐานข้อมูล ---
 # สร้าง Model ที่มี field ทั้งหมดจากฟอร์ม
@@ -107,10 +114,18 @@ class Submission(db.Model):
     evidence_other_check = db.Column(db.Boolean, default=False)
     evidence_other_upload = db.Column(db.String(300))
 
+# เพิ่ม Model ใหม่หลังจาก class Submission
+class Settings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(100), unique=True, nullable=False)
+    value = db.Column(db.Text, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 # --- PDF Generation  ---
 class PDF(FPDF):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, submission_id=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.submission_id = submission_id  # เก็บ submission_id สำหรับใช้ในการสร้างเลขที่เอกสาร
         try:
             self.add_font('Sarabun', '', 'static/fonts/Sarabun-Regular.ttf', uni=True)
             self.add_font('Sarabun', 'B', 'static/fonts/Sarabun-Bold.ttf', uni=True)
@@ -120,14 +135,42 @@ class PDF(FPDF):
             print("Font files not found. Please download...")
             pass
         self.set_font('Sarabun', '', 12)
-        
+        # เพิ่มการตั้งค่า encoding สำหรับภาษาไทย
+        self.set_auto_page_break(auto=True, margin=15)
+
+    def multi_cell(self, w, h, text, border=0, align='L', fill=False):
+        # แก้ไขปัญหาสระตกโดยการปรับแต่ง multi_cell
+        if isinstance(text, str):
+            # ทำการ normalize text สำหรับภาษาไทย
+            import unicodedata
+            text = unicodedata.normalize('NFC', text)
+        super().multi_cell(w, h, text, border, align, fill)
+
+    def cell(self, w, h=0, text='', border=0, ln=0, align='', fill=False, link=''):
+        # แก้ไขปัญหาสระตกโดยการปรับแต่ง cell
+        if isinstance(text, str):
+            # ทำการ normalize text สำหรับภาษาไทย
+            import unicodedata
+            text = unicodedata.normalize('NFC', text)
+        super().cell(w, h, text, border, ln, align, fill, link)
+
+    def text(self, x, y, text=''):
+        # แก้ไขปัญหาสระตกโดยการปรับแต่ง text
+        if isinstance(text, str):
+            # ทำการ normalize text สำหรับภาษาไทย
+            import unicodedata
+            text = unicodedata.normalize('NFC', text)
+        super().text(x, y, text)
+
     def header(self):
         # --- 1. เพิ่มรหัสเอกสารที่มุมบนขวา ---
         self.set_font('Sarabun', '', 9)
         self.set_text_color(128, 128, 128) # สีเทา
         # ไปที่มุมบนขวา
         self.set_y(5)
-        self.cell(0, 10, "IRD_06 (66)", 0, 0, 'R')
+        # สร้างเลขที่เอกสารแบบอัตโนมัติ โดยใช้ submission_id จาก PDF instance
+        document_number = f"IRD_06/{self.submission_id:05d}"  # Format: IRD_06/00001, IRD_06/00002, etc.
+        self.cell(0, 10, document_number, 0, 0, 'R')
         self.ln(5) # เลื่อนลงมาเล็กน้อย
         # --- 2. เพิ่มหัวข้อเอกสาร (จัดกึ่งกลาง) ---
         # กลับมาใช้ฟอนต์และสีปกติ
@@ -137,71 +180,85 @@ class PDF(FPDF):
         self.set_font('Sarabun', 'B', 12)
         self.cell(0, 8, "กองทุนส่งเสริมงานวิจัย มหาวิทยาลัยเทคโนโลยีราชมงคลธัญบุรี", 0, 1, 'C')
         self.set_font('Sarabun', 'B', 12)
-        self.cell(0, 8, "(สำหรับบทความวิจัยที่ตีพิมพ์เผยแพร่หลังวันที่ 26 กันยายน พ.ศ. 2566)", 0, 1, 'C')        
+        
+        # ดึงการตั้งค่าหมายเหตุจากฐานข้อมูล
+        setting = Settings.query.filter_by(key='header_note').first()
+        header_note = setting.value if setting else "(สำหรับบทความวิจัยที่ตีพิมพ์เผยแพร่หลังวันที่ 26 กันยายน พ.ศ. 2566)"
+        
+        self.cell(0, 8, header_note, 0, 1, 'C')        
         # เว้นบรรทัดลงมาให้พ้นส่วน header เพื่อเริ่มเนื้อหา
         self.ln(10)
-
-    def footer(self):
-        self.set_y(-15)
-        self.set_font('Sarabun', '', 8)
-        self.cell(0, 10, f'Page {self.page_no()}', 0, 0, 'C')
-
-    def chapter_title(self, title):
-        self.set_font('Sarabun', 'B', 14)
-        self.cell(0, 10, title, 0, 1, 'C')
-        self.ln(5)
-
-    def chapter_body(self, text):
-        self.set_font('Sarabun', '', 12)
-        self.multi_cell(0, 8, text)
-        self.ln()
-
-    def draw_checkbox(self, x, y, text, checked=False):
-        self.set_font('Sarabun', '', 11)
-        self.set_xy(x, y)
-        symbol = '✓' if checked else '☐'
-        self.multi_cell(180, 6, f'{symbol} {text}')
-    
-    def draw_radio(self, x, y, text, checked=False):
-        self.set_font('Sarabun', '', 11)
-        self.set_xy(x, y)
-        symbol = '◉' if checked else '○'
-        self.multi_cell(180, 6, f'{symbol} {text}')
-
-    def draw_field(self, label, value, x, y, w, h=8):
-        self.set_font('Sarabun', 'B', 11)
-        self.set_xy(x, y)
-        self.cell(w/3, h, label)
-        self.set_font('Sarabun', '', 11)
-        self.cell(w*2/3, h, str(value) if value else '', border='B')
 
 # --- Routes ---
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
         try:
+            print("=== POST Request Received ===")
+            print(f"Request files: {list(request.files.keys())}")
+            print(f"Request form: {list(request.form.keys())}")
+            
             # ฟังก์ชั่นผู้ช่วยในการจัดการการอัปโหลดไฟล์
             def handle_upload(field_name):
                 if field_name in request.files:
                     file = request.files[field_name]
                     if file and file.filename != '':
+                        print(f"Processing file: {file.filename} for field: {field_name}")
+                        
+                        # ตรวจสอบประเภทไฟล์
+                        if not allowed_file(file.filename):
+                            print(f"File type not allowed: {file.filename}")
+                            return None
+                        
                         filename = secure_filename(file.filename)
                         # Add timestamp to filename to avoid overwrites
                         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
                         unique_filename = f"{timestamp}_{filename}"
-                        file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
-                        return unique_filename
+                        
+                        # Create upload directory if it doesn't exist
+                        upload_dir = app.config['UPLOAD_FOLDER']
+                        if not os.path.exists(upload_dir):
+                            os.makedirs(upload_dir)
+                            print(f"Created upload directory: {upload_dir}")
+                        
+                        file_path = os.path.join(upload_dir, unique_filename)
+                        try:
+                            file.save(file_path)
+                            print(f"File saved successfully: {file_path}")
+                            # ตรวจสอบว่าไฟล์ถูกสร้างจริงหรือไม่
+                            if os.path.exists(file_path):
+                                file_size = os.path.getsize(file_path)
+                                print(f"File size: {file_size} bytes")
+                                return unique_filename
+                            else:
+                                print(f"File was not created: {file_path}")
+                                return None
+                        except Exception as e:
+                            print(f"Error saving file {unique_filename}: {e}")
+                            return None
+                else:
+                    print(f"No file found for field: {field_name}")
                 return None
             
             # ผู้ช่วยรับค่าช่องทำเครื่องหมาย
             def get_bool(name):
                 return True if request.form.get(name) else False
 
+            # จัดการข้อมูลตำแหน่งทางวิชาการ
+            academic_position = request.form.get('academicPosition')
+            if academic_position == 'อื่นๆ':
+                academic_position = request.form.get('academicPositionOther', '')
+
+            # จัดการข้อมูลสังกัด
+            affiliation = request.form.get('affiliation')
+            if affiliation == 'อื่นๆ':
+                affiliation = request.form.get('affiliationOther', '')
+
             new_submission = Submission(
                 # Part 1
                 full_name=request.form.get('fullName'),
-                academic_position=request.form.get('academicPosition'),
-                affiliation=request.form.get('affiliation'),
+                academic_position=academic_position,
+                affiliation=affiliation,
                 phone=request.form.get('phone'),
                 mobile_phone=request.form.get('mobilePhone'),
                 email=request.form.get('email'),
@@ -276,18 +333,44 @@ def index():
                 evidence_other_upload=handle_upload('evidence_other_upload'),
             )
             
+            print("=== File Upload Results ===")
+            print(f"Page charge: {new_submission.evidence_page_charge_upload}")
+            print(f"Full paper: {new_submission.evidence_full_paper_upload}")
+            print(f"Consent letter: {new_submission.evidence_consent_letter_upload}")
+            print(f"Quartile: {new_submission.evidence_quartile_upload}")
+            print(f"TCI: {new_submission.evidence_tci_upload}")
+            print(f"Editorial board: {new_submission.evidence_editorial_board_upload}")
+            print(f"Exhibition: {new_submission.evidence_exhibition_upload}")
+            print(f"Proof: {new_submission.evidence_proof_upload}")
+            print(f"NRMS: {new_submission.evidence_nrms_upload}")
+            print(f"Other: {new_submission.evidence_other_upload}")
+            
             db.session.add(new_submission)
             db.session.commit()
+            
+            # แสดงรายชื่อไฟล์ในโฟลเดอร์ uploads
+            upload_dir = app.config['UPLOAD_FOLDER']
+            if os.path.exists(upload_dir):
+                files_in_upload = os.listdir(upload_dir)
+                print(f"Files in uploads directory: {files_in_upload}")
+            else:
+                print("Upload directory does not exist")
             
             return jsonify({'status': 'success', 'message': 'ส่งข้อมูลสำเร็จเรียบร้อยแล้ว!'}), 200
 
         except Exception as e:
             # กรณีเกิดข้อผิดพลาด ก็ตอบกลับเป็น JSON เช่นกัน
             print(f"Error on submission: {e}")
+            import traceback
+            traceback.print_exc()
             return jsonify({'status': 'error', 'message': 'เกิดข้อผิดพลาดในการบันทึกข้อมูล'}), 500
 
     # สำหรับ request แบบ GET ให้แสดงหน้าฟอร์มปกติ
-    return render_template('index.html')
+    # ดึงการตั้งค่าหมายเหตุจากฐานข้อมูล
+    setting = Settings.query.filter_by(key='header_note').first()
+    header_note = setting.value if setting else "(สำหรับบทความวิจัยที่ตีพิมพ์เผยแพร่หลังวันที่ 26 กันยายน พ.ศ. 2566)"
+    
+    return render_template('index.html', header_note=header_note)
 
 @app.route('/login', methods=['POST']) # รับเฉพาะ POST เพราะไม่มีหน้า GET แล้ว
 def login():
@@ -326,7 +409,8 @@ def download_pdf(submission_id):
     if not session.get('admin_logged_in'):
         return redirect(url_for('index'))        
     s = Submission.query.get_or_404(submission_id)
-    pdf = PDF(orientation='P', unit='mm', format='A4')
+    # ส่ง submission_id ไปยัง PDF class
+    pdf = PDF(submission_id=submission_id, orientation='P', unit='mm', format='A4')
     pdf.add_page()    
     line_h = 6 # ความสูงมาตรฐานของบรรทัด
     
@@ -446,7 +530,7 @@ def download_pdf(submission_id):
     pdf.set_font('Sarabun', 'B', 11)
     pdf.cell(label_width_2, line_h, "สังกัด:", 0, 0)
     pdf.set_font('Sarabun', '', 11)
-    pdf.cell(0, line_h, f"{s.affiliation or ''}", border='', ln=1, align='C')
+    pdf.cell(0, line_h, f"{s.affiliation or ''}", border='B', ln=1, align='L')
     # --- บรรทัดที่ 3: ข้อมูลติดต่อ (3 คอลัมน์) ---
     col_width_3 = usable_width / 3
     label_width_3 = 25
@@ -615,27 +699,25 @@ def download_pdf(submission_id):
     draw_list_item("4.1", text_4_1, s.charge_int_checkbox, indent=item_indent)
     pdf.ln(2)
     # --- 4.2 ---
-    text_4_2_main = "ค่าสมนาคุณการตีพิมพ์บทความวิจัยในวารสารระดับนานาชาติให้ใช้ค่าควอไทล์ที่ปรากฎในฐานข้อมูลการจัดอันดับวารสาร Scopus..."
+    text_4_2_main = "ค่าสมนาคุณการตีพิมพ์บทความวิจัยในวารสารระดับนานาชาติให้ใช้ค่าควอไทล์ที่ปรากฎใน ฐานข้อมูลการ จัดอันดับวารสาร Scopus โดยพิจารณาจากปีล่าสุดที่ปรากฎอยู่ในฐานข้อมูล ณ วันที่บทความได้รับการ ตีพิมพ์ ดังนี้"
     draw_list_item("4.2", text_4_2_main, s.remuneration_int_checkbox, indent=item_indent)
     # --- รายการย่อยของ 4.2 (Radio Buttons) ---
-    if s.remuneration_int_checkbox:
-        quartile_map = {
-            'top10': 'Top 10% หรือ Tier 1 (สนับสนุน 60,000 บาท)',
-            'q1': 'ควอไทล์ที่ 1 (Q1) (สนับสนุน 30,000 บาท)',
-            'q2': 'ควอไทล์ที่ 2 (Q2) (สนับสนุน 20,000 บาท)',
-            'q3': 'ควอไทล์ที่ 3 (Q3) (สนับสนุน 10,000 บาท)',
-            'q4': 'ควอไทล์ที่ 4 (Q4) (สนับสนุน 8,000 บาท)',
-            'none': 'ไม่มีควอไทล์ (สนับสนุน 4,000 บาท)'
-        }
-        for value, text in quartile_map.items():
-            is_selected = (s.international_quartile == value)
-            draw_list_item("", text, is_selected, symbol_type='radio', indent=sub_item_indent)    
+    quartile_map = {
+        'top10': 'Top 10% หรือ Tier 1 (สนับสนุน 60,000 บาท)',
+        'q1': 'ควอไทล์ที่ 1 (Q1) (สนับสนุน 30,000 บาท)',
+        'q2': 'ควอไทล์ที่ 2 (Q2) (สนับสนุน 20,000 บาท)',
+        'q3': 'ควอไทล์ที่ 3 (Q3) (สนับสนุน 10,000 บาท)',
+        'q4': 'ควอไทล์ที่ 4 (Q4) (สนับสนุน 8,000 บาท)',
+        'none': 'ไม่มีควอไทล์ (สนับสนุน 4,000 บาท)'
+    }
+    for value, text in quartile_map.items():
+        is_selected = (s.international_quartile == value)
+        draw_list_item("", text, is_selected, symbol_type='radio', indent=sub_item_indent)    
     # --- รายการย่อยของ 4.2 (การหาร) ---
     # แก้ไข f-string ให้ใช้ placeholder
     text_4_2_share = f"กรณีทำงานร่วมกับสถาบันอื่น (นานาชาติ) จะจ่ายค่าสมนาคุณตามสัดส่วน (คำนวณ: ฐาน {s.share_int_base_amount or placeholder} / {s.share_int_num_institutes or placeholder} สถาบัน = {s.share_int_final_amount or placeholder} บาท)"
-    # จะแสดงผลก็ต่อเมื่อข้อ 4.2 ถูกเลือก
-    if s.remuneration_int_checkbox:
-         draw_list_item("", text_4_2_share, s.share_int_checkbox, indent=sub_item_indent)
+    # แสดงตัวเลือกการแบ่งสัดส่วนเสมอ
+    draw_list_item("", text_4_2_share, s.share_int_checkbox, indent=sub_item_indent)
     pdf.ln(5)
     
       # 5. กรณีตีพิมพ์ในวารสารประเภทบทความวิจัยที่ถูกคัดเลือกฯ (Special Issue)
@@ -739,10 +821,36 @@ def download_pdf(submission_id):
     pdf.ln(10) # เพิ่มระยะห่างก่อนส่วนลงนาม
 
     # --- สร้างและส่งไฟล์ PDF ---
-    pdf_filename = f"submission_{s.id}_{s.full_name}.pdf"
-    temp_dir = os.getcwd() 
-    pdf.output(os.path.join(temp_dir, pdf_filename))    
-    return send_from_directory(temp_dir, pdf_filename, as_attachment=True)
+    # แก้ไขการตั้งชื่อไฟล์ให้ใช้ชื่อผลงาน และชื่อผู้ขอรับการสนับสนุน
+    work_name = s.work_name_th or s.work_name_en or "ผลงาน"
+    applicant_name = s.full_name or "ผู้ขอรับการสนับสนุน"
+    
+    # ทำความสะอาดชื่อไฟล์ (ลบอักขระที่ไม่เหมาะสม)
+    work_name_clean = "".join(c for c in work_name if c.isalnum() or c in (' ', '-', '_')).rstrip()
+    applicant_name_clean = "".join(c for c in applicant_name if c.isalnum() or c in (' ', '-', '_')).rstrip()
+    
+    pdf_filename = f"{work_name_clean}_{applicant_name_clean}.pdf"
+    
+    # กำหนดโฟลเดอร์ปลายทาง - ลองหาโฟลเดอร์ Downloads ของ Admin
+    try:
+        # สำหรับ Windows
+        downloads_dir = os.path.join(os.path.expanduser("~"), "Downloads")
+        if not os.path.exists(downloads_dir):
+            # ถ้าหา Downloads ไม่เจอ ให้ใช้ Desktop แทน
+            downloads_dir = os.path.join(os.path.expanduser("~"), "Desktop")
+        if not os.path.exists(downloads_dir):
+            # ถ้าหา Desktop ก็ไม่เจอ ให้ใช้ current directory
+            downloads_dir = os.getcwd()
+    except:
+        # ถ้าเกิดข้อผิดพลาดใดๆ ให้ใช้ current directory
+        downloads_dir = os.getcwd()
+    
+    # บันทึกไฟล์ PDF ลงในโฟลเดอร์ปลายทาง
+    pdf_path = os.path.join(downloads_dir, pdf_filename)
+    pdf.output(pdf_path)
+    
+    # ส่งไฟล์ให้ดาวน์โหลด
+    return send_from_directory(downloads_dir, pdf_filename, as_attachment=True)
 
 # --- สำหรับเปิดดูไฟล์ที่อัปโหลด ---
 @app.route('/uploads/<path:filename>')
@@ -809,12 +917,84 @@ def delete_submission(submission_id):
     flash(f'รายการ ID {submission.id} ได้ถูกลบเรียบร้อยแล้ว', 'success') # ส่งข้อความแจ้งเตือน
     return redirect(url_for('admin'))
 
+# เพิ่ม Routes ใหม่หลังจาก @app.route('/admin')
+@app.route('/admin/settings', methods=['GET', 'POST'])
+def admin_settings():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        header_note = request.form.get('header_note')
+        
+        # อัปเดตหรือสร้างการตั้งค่าใหม่
+        setting = Settings.query.filter_by(key='header_note').first()
+        if setting:
+            setting.value = header_note
+            setting.updated_at = datetime.utcnow()
+        else:
+            setting = Settings(key='header_note', value=header_note)
+            db.session.add(setting)
+        
+        db.session.commit()
+        flash('อัปเดตการตั้งค่าเรียบร้อยแล้ว', 'success')
+        return redirect(url_for('admin_settings'))
+    
+    # ดึงการตั้งค่าปัจจุบัน
+    setting = Settings.query.filter_by(key='header_note').first()
+    current_note = setting.value if setting else "(สำหรับบทความวิจัยที่ตีพิมพ์เผยแพร่หลังวันที่ 26 กันยายน พ.ศ. 2566)"
+    
+    return render_template('admin_settings.html', current_note=current_note)
+
+@app.errorhandler(413)
+def too_large(e):
+    return jsonify({'status': 'error', 'message': 'ไฟล์ใหญ่เกินไป (ขนาดสูงสุด 16 MB)'}), 413
+
+@app.route('/test_upload')
+def test_upload():
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head><title>Test Upload</title></head>
+    <body>
+        <h1>Test File Upload</h1>
+        <form method="post" enctype="multipart/form-data" action="/">
+            <label>Name:</label><br>
+            <input type="text" name="fullName" value="Test User" required><br><br>
+            
+            <label>Affiliation:</label><br>
+            <input type="text" name="affiliation" value="Test University" required><br><br>
+            
+            <label>Page Charge Evidence:</label><br>
+            <input type="checkbox" name="evidence_page_charge_check" checked>
+            <input type="file" name="evidence_page_charge_upload" accept=".pdf"><br><br>
+            
+            <button type="submit">Submit</button>
+        </form>
+    </body>
+    </html>
+    """
+
 if __name__ == '__main__':
-    # สร้างฐานข้อมูลและตารางหากไม่มีอยู่จริง
-    if not os.path.exists('database.db'):
-        with app.app_context():
-            db.create_all()
-            print("Database created.")
+    with app.app_context():
+        # สร้างตารางหากไม่มีอยู่จริง
+        db.create_all()
+        
+        # ตรวจสอบและสร้างการตั้งค่าเริ่มต้นหากจำเป็น
+        try:
+            existing_setting = Settings.query.filter_by(key='header_note').first()
+            if not existing_setting:
+                default_setting = Settings(
+                    key='header_note', 
+                    value='(สำหรับบทความวิจัยที่ตีพิมพ์เผยแพร่หลังวันที่ 26 กันยายน พ.ศ. 2566)'
+                )
+                db.session.add(default_setting)
+                db.session.commit()
+                print("Default settings created.")
+            else:
+                print("Settings already exist.")
+        except Exception as e:
+            db.session.rollback()
+            print(f"Settings initialization error: {e}")
     
     # สร้างโฟลเดอร์อัปโหลดหากไม่มีอยู่จริง
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
@@ -826,4 +1006,4 @@ if __name__ == '__main__':
         os.makedirs('static/fonts')
         print("Static fonts folder created. Please add Sarabun-Regular.ttf and Sarabun-Bold.ttf")
 
-    app.run(debug=True, host='', port=5000)  # ปรับ debug เป็น False สำหรับ production
+    app.run(debug=True, host='127.0.0.1', port=5000)  # ปรับ debug เป็น False สำหรับ production

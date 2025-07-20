@@ -207,7 +207,7 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
         });
         
         popupClose.addEventListener('click', () => { successPopup.style.display = 'none'; });
-        successPopup.addEventListener('click', (event) => { if(event.target === successPopup) { successPopup.style.display = 'none'; } });
+        // ลบ event listener สำหรับคลิกนอก popup
     }
 
     // --- จัดการ Popup Login ---
@@ -224,7 +224,7 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
         });
 
         loginPopupClose.addEventListener('click', () => { loginPopupContainer.style.display = 'none'; });
-        loginPopupContainer.addEventListener('click', (event) => { if(event.target === loginPopupContainer) { loginPopupContainer.style.display = 'none'; } });
+        // ลบ event listener สำหรับคลิกนอก popup
 
         loginForm.addEventListener('submit', function(event) {
             event.preventDefault();
@@ -246,6 +246,7 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
         });
     }
 
+   
     // ==========================================================
     // === ส่วนที่ 4: ระบบ Modal Popup ในหน้า Admin           ===
     // ==========================================================
@@ -302,7 +303,7 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
         });
         
         closeModalBtn.addEventListener('click', closeModal);
-        window.addEventListener('click', (event) => { if (event.target == detailsModal) { closeModal(); } });
+        // ลบ event listener สำหรับคลิกนอก modal
     }
     
 });

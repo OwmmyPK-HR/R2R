@@ -3,78 +3,145 @@
 
 body {
     font-family: 'Sarabun', sans-serif;
-    background-color: #f8f9fa; /* พื้นหลังสีเทาอ่อน */
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     color: #495057;
     margin: 0;
-    line-height: 1.7;
+    line-height: 1.6;
+    min-height: 100vh;
 }
 
-/* --- 2. Header Bar --- */
+/* =================================================== */
+/* ===     2. Header Bar (ปรับแต่งใหม่ให้เป็นทางการ) === */
+/* =================================================== */
+
 .header-bar {
-    background-color: #2c3e50; /* สีน้ำเงินเข้ม */
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    padding: 1rem 2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    padding: 2rem 2.5rem;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    position: relative;
+}
+
+.header-content {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0;
 }
 
 .header-title {
-    font-size: 1.4rem;
+    font-size: 1.8em;
+    font-weight: 700;
+    margin: 0 0 0.5rem 0;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.header-subtitle {
+    font-size: 1.2em;
+    font-weight: 500;
+    margin: 0 0 0.75rem 0;
+    opacity: 0.95;
+}
+
+.header-note {
+    font-size: 1em;
+    font-style: italic;
     margin: 0;
+    opacity: 0.9;
+    background: rgba(255,255,255,0.1);
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    display: inline-block;
+    border: 1px solid rgba(255,255,255,0.2);
 }
 
 .admin-login-button {
-    background-color: #ffffff;
-    color: #2c3e50;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 5px;
-    cursor: pointer;
-    font-weight: bold;
+    position: absolute;
+    top: 2rem;
+    right: 2.5rem;
+    background: rgba(255,255,255,0.9);
+    color: #764ba2;
+    border: 2px solid rgba(255,255,255,0.3);
+    padding: 0.7rem 1.5rem;
     font-size: 0.9rem;
-    transition: background-color 0.2s ease-in-out;
+    border-radius: 25px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
 }
 
 .admin-login-button:hover {
-    background-color: #e9ecef;
+    background: rgba(255,255,255,1);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
 
-/* --- 3. Main Form Container --- */
+/* --- 3. Main Form Container (ปรับปรุงใหม่) --- */
 .container {
-    max-width: 900px;
-    margin: 2.5rem auto; /* เว้นระยะจาก Header */
+    max-width: 950px;
+    margin: 3rem auto;
     background: #ffffff;
-    padding: 2.5rem;
-    border-radius: 12px;
-    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+    padding: 3rem;
+    border-radius: 15px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    position: relative;
 }
 
-/* --- 4. Form Elements (Fieldset, Legend, Input) --- */
+.container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 15px 15px 0 0;
+}
+
+/* --- 4. Form Elements (ปรับปรุงใหม่) --- */
 fieldset {
+    border: 2px solid #e9ecef;
+    padding: 2rem;
+    margin-bottom: 2.5rem;
+    border-radius: 12px;
+    background: #fafbfc;
+    position: relative;
+}
+
+fieldset.inner-fieldset {
+    background: #ffffff;
     border: 1px solid #dee2e6;
+    margin: 1.5rem 0;
     padding: 1.5rem;
-    margin-bottom: 2rem;
-    border-radius: 8px;
 }
 
 legend {
-    font-weight: bold;
-    font-size: 1.25em;
-    color: #343a40;
-    padding: 0 0.8rem;
+    font-weight: 700;
+    font-size: 1.3em;
+    color: #2c3e50;
+    padding: 0 1rem;
+    background: white;
+    border-radius: 8px;
+    border: 2px solid #e9ecef;
+}
+
+fieldset.inner-fieldset legend {
+    font-size: 1.1em;
+    color: #495057;
+    border: 1px solid #dee2e6;
 }
 
 .form-group {
-    margin-bottom: 1.2rem;
+    margin-bottom: 1.5rem;
 }
 
 label {
     display: block;
-    margin-bottom: 0.5rem;
-    font-weight: bold;
+    margin-bottom: 0.7rem;
+    font-weight: 600;
     color: #495057;
+    font-size: 1.05em;
 }
 
 input[type="text"],
@@ -83,54 +150,67 @@ input[type="tel"],
 input[type="number"],
 input[type="date"],
 input[type="password"],
+select,
 textarea {
     width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #ced4da;
-    border-radius: 6px;
+    padding: 0.9rem;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
     box-sizing: border-box;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    transition: all 0.3s ease;
+    font-size: 1rem;
+    background: #fff;
 }
 
-input:focus {
-    border-color: #80bdff;
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+input:focus,
+select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
     outline: none;
 }
 
 .checkbox-group, .radio-group {
     display: flex;
     align-items: flex-start;
-    margin-bottom: 0.8rem;
-}
-.checkbox-group label, .radio-group label {
-    font-weight: normal;
-    margin-left: 0.7rem;
-}
-input[type="checkbox"], input[type="radio"] {
-    margin-top: 0.3rem;
+    margin-bottom: 1rem;
+    padding: 0.5rem 0;
 }
 
-/* --- 5. Buttons --- */
+.checkbox-group label, .radio-group label {
+    font-weight: 500;
+    margin-left: 0.8rem;
+    line-height: 1.5;
+}
+
+input[type="checkbox"], input[type="radio"] {
+    margin-top: 0.3rem;
+    transform: scale(1.2);
+}
+
+/* --- 5. Buttons (ปรับปรุงใหม่) --- */
 .submit-btn {
     display: block;
     width: 100%;
-    padding: 0.9rem;
+    padding: 1.2rem;
     border: none;
-    background: linear-gradient(45deg, #007bff, #0056b3);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    font-size: 1.1em;
-    font-weight: bold;
-    border-radius: 8px;
+    font-size: 1.2em;
+    font-weight: 700;
+    border-radius: 12px;
     cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-.submit-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 2rem;
 }
 
-/* --- 6. Popups (Success & Login) --- */
+.submit-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+
+/* --- 6. Popups (เหมือนเดิมแต่ปรับปรุงเล็กน้อย) --- */
 .popup-container {
     display: none;
     position: fixed;
@@ -139,36 +219,61 @@ input[type="checkbox"], input[type="radio"] {
     top: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0,0,0,0.5);
+    background-color: rgba(0,0,0,0.6);
     justify-content: center;
     align-items: center;
+    backdrop-filter: blur(5px);
 }
+
 .popup-content {
     background-color: #fff;
-    padding: 2rem;
-    border-radius: 10px;
+    padding: 2.5rem;
+    border-radius: 15px;
     text-align: center;
     position: relative;
     width: 90%;
-    max-width: 450px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-    animation: fadeIn 0.3s;
+    max-width: 500px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    animation: fadeIn 0.4s ease-out;
 }
+
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-20px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(-30px) scale(0.9); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
 }
+
 .popup-close {
     position: absolute;
-    top: 10px;
+    top: 15px;
     right: 20px;
     font-size: 28px;
     font-weight: bold;
     cursor: pointer;
     color: #aaa;
+    width: 35px;
+    height: 35px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%;
+    transition: all 0.3s;
 }
-.popup-content h2 { color: #4CAF50; }
-.popup-content.error h2 { color: #f44336; }
+
+.popup-close:hover {
+    color: #000;
+    background-color: #f1f1f1;
+    transform: rotate(90deg);
+}
+
+.popup-content h2 { 
+    color: #4CAF50; 
+    margin-bottom: 1rem;
+    font-size: 1.5em;
+}
+
+.popup-content.error h2 { 
+    color: #f44336; 
+}
 
 .error-msg {
     color: #f44336;
@@ -177,21 +282,95 @@ input[type="checkbox"], input[type="radio"] {
     height: 1.2em;
 }
 
-/* --- 7. Responsive Design --- */
+/* --- 7. Responsive Design (ปรับปรุงใหม่) --- */
 @media (max-width: 768px) {
     .header-bar {
-        flex-direction: column;
-        padding: 1rem;
-        gap: 0.5rem;
+        padding: 1.5rem 1rem;
     }
+    
+    .admin-login-button {
+        position: static;
+        margin-top: 1rem;
+        width: auto;
+    }
+    
+    .header-title {
+        font-size: 1.5em;
+    }
+    
+    .header-subtitle {
+        font-size: 1.1em;
+    }
+    
     .container {
-        margin: 1rem auto;
+        margin: 1.5rem auto;
+        padding: 2rem 1.5rem;
+    }
+    
+    fieldset {
         padding: 1.5rem;
     }
 }
 
+/* --- เพิ่มสไตล์สำหรับความเป็นทางการ --- */
+.form-note {
+    background: #e8f4fd;
+    border-left: 4px solid #2196F3;
+    padding: 1rem;
+    margin: 1rem 0;
+    border-radius: 0 8px 8px 0;
+    font-style: italic;
+    color: #1976D2;
+}
+
+.sub-options {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+    border: 1px solid #e9ecef;
+}
+
+.contact-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: end;
+}
+
+.contact-group > div {
+    display: flex;
+    flex-direction: column;
+    min-width: 200px;
+    flex: 1;
+}
+
+@media (max-width: 768px) {
+    .contact-group {
+        flex-direction: column;
+    }
+    
+    .contact-group > div {
+        min-width: auto;
+    }
+}
+
+
+.inline-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    align-items: end;
+}
+
+@media (max-width: 768px) {
+    .inline-group {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* =================================================== */
-/* === ดีไซน์ใหม่สำหรับหน้า Admin และ Pagination      === */
+/* === ส่วนที่เหลือคงเดิม (ไม่แก้ไข) === */
 /* =================================================== */
 
 /* --- ส่วนหัวในหน้า Admin --- */
@@ -543,6 +722,7 @@ input[type="checkbox"], input[type="radio"] {
     display: flex;
     flex-direction: column;
     animation: slideIn 0.3s ease-out;
+    position: relative;
 }
 @keyframes slideIn {
     from { opacity: 0; transform: translateY(-30px); }
@@ -551,11 +731,23 @@ input[type="checkbox"], input[type="radio"] {
 .modal-close {
     color: #aaa;
     position: absolute;
-    top: 10px;
-    right: 25px;
-    font-size: 32px;
+    top: 15px;
+    right: 20px;
+    font-size: 28px;
     font-weight: bold;
     cursor: pointer;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%;
+    transition: all 0.2s;
+    z-index: 1;
+}
+.modal-close:hover {
+    color: #000;
+    background-color: #f1f1f1;
 }
 .modal-content h2 {
     padding: 1.5rem 2rem;
@@ -573,32 +765,29 @@ input[type="checkbox"], input[type="radio"] {
     text-align: center;
     color: #6c757d;
 }
-/* สไตล์สำหรับลิสต์ไฟล์ */
-.file-list {
-    list-style: none;
-    padding: 0;
-    margin-top: 1.5rem;
-}
-.file-list li {
-    margin-bottom: 0.8rem;
-}
-.file-list a {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.7rem;
-    color: #007bff;
-    text-decoration: none;
+
+/* เพิ่ม CSS สำหรับปุ่มการตั้งค่า */
+.action-btn {
+    display: inline-block;
     padding: 0.5rem 1rem;
-    border: 1px solid #dee2e6;
+    background-color: #28a745;
+    color: white;
+    text-decoration: none;
     border-radius: 5px;
-    background-color: #f8f9fa;
-    transition: all 0.2s;
+    font-size: 0.9em;
+    font-weight: bold;
+    transition: background-color 0.2s;
+    border: none;
+    cursor: pointer;
+    margin-right: 0.5rem;
 }
-.file-list a:hover {
-    background-color: #e2e6ea;
-    border-color: #dae0e5;
+
+.action-btn:hover {
+    background-color: #218838;
 }
-.file-list .fas {
-    color: #dc3545; /* สีไอคอน PDF */
+
+.admin-header div {
+    display: flex;
+    align-items: center;
 }
 
