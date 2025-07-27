@@ -197,6 +197,27 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
         });
     }
     
+    // --- ตรวจสอบเพดานตัวเลข 10,000 บาทสำหรับ International Page charge Q1 Q2 (4.1.1) ---
+    const chargeIntQ1Q2AmountInput = document.getElementById('charge_int_q1q2_amount');
+    if (chargeIntQ1Q2AmountInput) {
+        chargeIntQ1Q2AmountInput.addEventListener('input', function() {
+            const value = parseFloat(this.value);
+            if (value > 10000) {
+                alert('จำนวนเงินต้องไม่เกิน 10,000 บาท ตามเพดานที่กำหนด');
+                this.value = 10000; // ตั้งค่าเป็น 10000 อัตโนมัติ
+            }
+        });
+        
+        // ตรวจสอบเมื่อผู้ใช้พิมพ์เสร็จแล้ว (blur)
+        chargeIntQ1Q2AmountInput.addEventListener('blur', function() {
+            const value = parseFloat(this.value);
+            if (value > 10000) {
+                alert('จำนวนเงินต้องไม่เกิน 10,000 บาท ตามเพดานที่กำหนด');
+                this.value = 10000;
+            }
+        });
+    }
+    
     // ==========================================================
     // === ส่วนที่ 3: ระบบ Popup ทั้งหมด (ส่งฟอร์ม, Login)  ===
     // ==========================================================
@@ -210,7 +231,7 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
             },
             {
                 name: '2. ขอบเขตของบทความวิจัยหรืองานสร้างสรรค์ที่ขอรับการสนับสนุนค่าสมนาคุณ',
-                selectors: ['#scope_2_1', '#scope_2_2']
+                selectors: ['#scope_2_1', '#scope_2_2', '#scope_2_3']  // ← เพิ่ม #scope_2_3
             },
             {
                 name: '3. หลักเกณฑ์การจ่ายเงิน และรางวัลสนับสนุนการตีพิมพ์บทความวิจัย กรณีตีพิมพ์ในวารสารระดับชาติ',
@@ -218,7 +239,7 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
             },
             {
                 name: '4. หลักเกณฑ์การจ่ายเงิน และรางวัลสนับสนุนการตีพิมพ์บทความวิจัย กรณีตีพิมพ์ในวารสารระดับนานาชาติ',
-                selectors: ['#charge_int_checkbox', '#remuneration_int_checkbox', '#share_int_checkbox']
+                selectors: ['#charge_int_checkbox', '#charge_int_q1q2_checkbox', '#remuneration_int_checkbox', '#share_int_checkbox']
             },
             {
                 name: '5. กรณีตีพิมพ์ในวารสาร ประเภทบทความวิจัยที่ถูกคัดเลือกมาจากการประชุมวิชาการและนำมาตีพิมพ์ลงใน วารสาร (Journal) และเป็นฉบับพิเศษ (Special Issue)',

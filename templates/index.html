@@ -148,15 +148,19 @@
                                การเผยแพร่ผลงานวิจัยหรืองานสร้างสรรค์) </legend>
                     <div class="checkbox-group">
                         <input type="checkbox" id="scope_2_1" name="scope_2_1" value="true">
-                        <label for="scope_2_1">2.1 เป็นบทความวิจัยหรืองานสร้างสรรค์ที่ไม่เคยเผยแพร่ที่ใดมาก่อนหรือเผยแพร่ไม่เกิน 1 ปี 
-                                                   <B>หมายเหตุ</B> บทความใดที่ได้ลงตีพิมพ์ในการประชุมวิชาการ และถูกคัดเลือกมาลงในวารสาร(Journal) 
-                                                   สามารถขอรับการสนับสนุนได้เพียงอย่างเดียว</label>
+                        <label for="scope_2_1">2.1 เป็นบทความวิจัยหรืองานสร้างสรรค์ที่ไม่เคยเผยแพร่ที่ใดมาก่อนหรือเผยแพร่ไม่เกิน 1 ปี</label>
                     </div>
+                    <p class="form-note"><B>หมายเหตุ</B> บทความใดที่ได้ลงตีพิมพ์ในการประชุมวิชาการ และถูกคัดเลือกมาลงในวารสาร(Journal) 
+                                                   สามารถขอรับการสนับสนุนได้เพียงอย่างเดียว</p>
                     <div class="checkbox-group">
                         <input type="checkbox" id="scope_2_2" name="scope_2_2" value="true">
                         <label for="scope_2_2">2.2 บทความวิจัยที่ขอรับการสนับสนุนต้องไม่เป็นส่วนหนึ่งของผลงานวิจัยที่สำเร็จการศึกษาของ ผู้รับการสนับสนุนผลงานวิจัย
                                                    และไม่รวมถึงจดหมายถึงบรรณาธิการ (Letter to editor,Short communication note) 
                                                    หรืองานเขียนขึ้นที่ลักษณะคล้ายกับที่กล่าวข้างต้น</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="scope_2_3" name="scope_2_3" value="true">
+                        <label for="scope_2_3">2.3 บทความวิจัยที่ขอรับการสนับสนุนจะต้องมีผู้เขียนที่ระบุชื่อหน่วยงานของมหาวิทยาลัยเทคโนโลยีราชมงคลธัญบุรีที่ตำแหน่งที่อยู่ของผู้เขียนในบทความวิจัยไม่น้อยกว่าร้อยละ 50</label>
                     </div>
                 </fieldset>
 
@@ -201,12 +205,25 @@
                     <div class="main-label-line">
                         <input type="checkbox" id="charge_int_checkbox" name="charge_int_checkbox" value="true">
                         <label for="charge_int_checkbox">4.1 ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์ (Page charge) ในวารสารวิชาการที่ปรากฏในฐานข้อมูลสากล
-                                                             ที่อยู่ในกลุ่มอันดับสูงสุดร้อยละสิบ (Top 10% หรือ Tier 1), Q1 และ Q2 สนับสนุนตามที่จ่ายจริง แต่ไม่เกิน 
+                                                             ที่อยู่ในกลุ่มอันดับสูงสุดร้อยละสิบ (Top 10% หรือ Tier 1) สนับสนุนตามที่จ่ายจริง แต่ไม่เกิน 
                                                              10,000 บาท ต่อเรื่อง</label>
                     </div>
                     <div class="input-line">
                         <label class="sub-label" for="charge_int_amount">โปรดระบุจำนวนเงิน:</label>
                         <input type="number" id="charge_int_amount" name="charge_int_amount" placeholder="0" class="inline-input" min="0" max="10000">
+                        <span>บาท</span>
+                    </div>
+                    </div>
+                    <div class="checkbox-group vertical-input-group">
+                    <div class="main-label-line">
+                        <input type="checkbox" id="charge_int_q1q2_checkbox" name="charge_int_q1q2_checkbox" value="true">
+                        <label for="charge_int_q1q2_checkbox">ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์ (Page charge) ในวารสารวิชาการที่ปรากฏในฐานข้อมูลสากล
+                                                             ที่อยู่ในกลุ่ม Q1 และ Q2 ให้สนับสนุนตามที่จ่ายจริงหลังหักค่าสมนาคุณการตีพิมพ์บทความวิจัยตามข้อ 4.2 แต่ไม่เกิน 
+                                                             10,000 บาท ต่อเรื่อง</label>
+                    </div>
+                    <div class="input-line">
+                        <label class="sub-label" for="charge_int_q1q2_amount">โปรดระบุจำนวนเงิน:</label>
+                        <input type="number" id="charge_int_q1q2_amount" name="charge_int_q1q2_amount" placeholder="0" class="inline-input" min="0" max="10000">
                         <span>บาท</span>
                     </div>
                     </div>

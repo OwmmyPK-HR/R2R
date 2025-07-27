@@ -66,6 +66,7 @@ class Submission(db.Model):
     qual_1_3 = db.Column(db.Boolean, default=False)
     scope_2_1 = db.Column(db.Boolean, default=False)
     scope_2_2 = db.Column(db.Boolean, default=False)
+    scope_2_3 = db.Column(db.Boolean, default=False)
     payment_3_1 = db.Column(db.Boolean, default=False)
     page_charge_amount = db.Column(db.String(50))
     payment_3_2 = db.Column(db.Boolean, default=False)
@@ -76,6 +77,8 @@ class Submission(db.Model):
     # Part 4
     charge_int_checkbox = db.Column(db.Boolean, default=False)
     charge_int_amount = db.Column(db.String(50))
+    charge_int_q1q2_checkbox = db.Column(db.Boolean, default=False)
+    charge_int_q1q2_amount = db.Column(db.String(50))
     remuneration_int_checkbox = db.Column(db.Boolean, default=False)
     international_quartile = db.Column(db.String(50))
     share_int_checkbox = db.Column(db.Boolean, default=False)
@@ -208,187 +211,125 @@ class PDF(FPDF):
 def index():
     if request.method == 'POST':
         try:
-            print("=== POST Request Received ===")
-            print(f"Request files: {list(request.files.keys())}")
-            print(f"Request form: {list(request.form.keys())}")
+            # Create a new submission instance
+            new_submission = Submission()
             
-            # ฟังก์ชั่นผู้ช่วยในการจัดการการอัปโหลดไฟล์
-            def handle_upload(field_name):
+            # --- ส่วนที่ 1: ข้อมูลส่วนตัว ---
+            new_submission.full_name = request.form.get('fullName')
+            new_submission.academic_position = request.form.get('academicPosition') or request.form.get('academicPositionOther')
+            new_submission.affiliation = request.form.get('affiliation') or request.form.get('affiliationOther')
+            new_submission.phone = request.form.get('phone')
+            new_submission.mobile_phone = request.form.get('mobilePhone')
+            new_submission.email = request.form.get('email')
+
+            # --- ส่วนที่ 2: ข้อมูลผลงาน ---
+            new_submission.work_name_th = request.form.get('work_name_th')
+            new_submission.work_name_en = request.form.get('work_name_en')
+            new_submission.funding_source = request.form.get('funding_source')
+            new_submission.fiscal_year = request.form.get('fiscal_year')
+            new_submission.project_name = request.form.get('project_name')
+            
+            # Qualifications (Section 1)
+            new_submission.qual_1_1 = request.form.get('qual_1_1') == 'true'
+            new_submission.qual_1_2 = request.form.get('qual_1_2') == 'true'
+            new_submission.qual_1_3 = request.form.get('qual_1_3') == 'true'
+            
+            # Scope (Section 2) - เพิ่มข้อ 2.3 ใหม่
+            new_submission.scope_2_1 = request.form.get('scope_2_1') == 'true'
+            new_submission.scope_2_2 = request.form.get('scope_2_2') == 'true'
+            new_submission.scope_2_3 = request.form.get('scope_2_3') == 'true'  # ← เพิ่มบรรทัดนี้
+            
+            # --- ส่วนที่ 3: การสนับสนุน (ระดับชาติ) ---
+            new_submission.payment_3_1 = request.form.get('payment_3_1') == 'true'
+            new_submission.page_charge_amount = request.form.get('page_charge_amount')
+            new_submission.payment_3_2 = request.form.get('payment_3_2') == 'true'
+            new_submission.payment_3_3 = request.form.get('payment_3_3') == 'true'
+            new_submission.num_institutes_3_3 = request.form.get('num_institutes_3_3')
+            new_submission.share_amount_3_3 = request.form.get('share_amount_3_3')
+            
+            # --- ส่วนที่ 4: การสนับสนุน (ระดับนานาชาติ) ---
+            new_submission.charge_int_checkbox = request.form.get('charge_int_checkbox') == 'true'
+            new_submission.charge_int_amount = request.form.get('charge_int_amount')
+            new_submission.charge_int_q1q2_checkbox = request.form.get('charge_int_q1q2_checkbox') == 'true'
+            new_submission.charge_int_q1q2_amount = request.form.get('charge_int_q1q2_amount')
+            new_submission.remuneration_int_checkbox = request.form.get('remuneration_int_checkbox') == 'true'
+            new_submission.international_quartile = request.form.get('international_quartile')
+            new_submission.share_int_checkbox = request.form.get('share_int_checkbox') == 'true'
+            new_submission.share_int_base_amount = request.form.get('share_int_base_amount')
+            new_submission.share_int_num_institutes = request.form.get('share_int_num_institutes')
+            new_submission.share_int_final_amount = request.form.get('share_int_final_amount')
+
+            # --- ส่วนที่ 5: กรณีตีพิมพ์ในวารสารประเภทบทความวิจัยที่ถูกคัดเลือกฯ (Special Issue) ---
+            new_submission.special_nat_checkbox = request.form.get('special_nat_checkbox') == 'true'
+            new_submission.special_nat_share_checkbox = request.form.get('special_nat_share_checkbox') == 'true'
+            new_submission.special_nat_share_num_institutes = request.form.get('special_nat_share_num_institutes')
+            new_submission.special_nat_share_final_amount = request.form.get('special_nat_share_final_amount')
+            new_submission.special_int_checkbox = request.form.get('special_int_checkbox') == 'true'
+            new_submission.special_international_quartile = request.form.get('special_international_quartile')
+            new_submission.special_int_share_checkbox = request.form.get('special_int_share_checkbox') == 'true'
+            new_submission.special_int_share_base_amount = request.form.get('special_int_share_base_amount')
+            new_submission.special_int_share_num_institutes = request.form.get('special_int_share_num_institutes')
+            new_submission.special_int_share_final_amount = request.form.get('special_int_share_final_amount')
+
+            # --- ส่วนที่ 6: ค่าสมนาคุณงานสร้างสรรค์ที่เผยแพร่ ---
+            new_submission.creative_level_asean = request.form.get('creative_level_asean') == 'true'
+            new_submission.creative_level_inter_coop = request.form.get('creative_level_inter_coop') == 'true'
+            new_submission.creative_level_national = request.form.get('creative_level_national') == 'true'
+            new_submission.creative_level_institutional = request.form.get('creative_level_institutional') == 'true'
+            new_submission.creative_level_public = request.form.get('creative_level_public') == 'true'
+            new_submission.creative_share_checkbox = request.form.get('creative_share_checkbox') == 'true'
+            new_submission.creative_share_base_amount = request.form.get('creative_share_base_amount')
+            new_submission.creative_share_num_institutes = request.form.get('creative_share_num_institutes')
+            new_submission.creative_share_final_amount = request.form.get('creative_share_final_amount')
+
+            # --- ส่วนที่ 7: หลักฐานประกอบการเสนอขอรับการสนับสนุน ---
+            new_submission.evidence_page_charge_check = request.form.get('evidence_page_charge_check') == 'true'
+            new_submission.evidence_full_paper_check = request.form.get('evidence_full_paper_check') == 'true'
+            new_submission.evidence_consent_letter_check = request.form.get('evidence_consent_letter_check') == 'true'
+            new_submission.evidence_quartile_check = request.form.get('evidence_quartile_check') == 'true'
+            new_submission.evidence_tci_check = request.form.get('evidence_tci_check') == 'true'
+            new_submission.evidence_editorial_board_check = request.form.get('evidence_editorial_board_check') == 'true'
+            new_submission.evidence_exhibition_check = request.form.get('evidence_exhibition_check') == 'true'
+            new_submission.evidence_proof_check = request.form.get('evidence_proof_check') == 'true'
+            new_submission.evidence_nrms_check = request.form.get('evidence_nrms_check') == 'true'
+            new_submission.evidence_other_check = request.form.get('evidence_other_check') == 'true'
+
+            # File uploads handling
+            file_fields = [
+                'evidence_page_charge_upload', 'evidence_full_paper_upload',
+                'evidence_consent_letter_upload', 'evidence_quartile_upload',
+                'evidence_tci_upload', 'evidence_editorial_board_upload',
+                'evidence_exhibition_upload', 'evidence_proof_upload',
+                'evidence_nrms_upload', 'evidence_other_upload',
+                'consent_evidence_pdf'
+            ]
+
+            for field_name in file_fields:
                 if field_name in request.files:
                     file = request.files[field_name]
-                    if file and file.filename != '':
-                        print(f"Processing file: {file.filename} for field: {field_name}")
-                        
-                        # ตรวจสอบประเภทไฟล์
-                        if not allowed_file(file.filename):
-                            print(f"File type not allowed: {file.filename}")
-                            return None
-                        
+                    if file and file.filename and allowed_file(file.filename):
                         filename = secure_filename(file.filename)
-                        # Add timestamp to filename to avoid overwrites
-                        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                        unique_filename = f"{timestamp}_{filename}"
-                        
-                        # Create upload directory if it doesn't exist
-                        upload_dir = app.config['UPLOAD_FOLDER']
-                        if not os.path.exists(upload_dir):
-                            os.makedirs(upload_dir)
-                            print(f"Created upload directory: {upload_dir}")
-                        
-                        file_path = os.path.join(upload_dir, unique_filename)
-                        try:
-                            file.save(file_path)
-                            print(f"File saved successfully: {file_path}")
-                            # ตรวจสอบว่าไฟล์ถูกสร้างจริงหรือไม่
-                            if os.path.exists(file_path):
-                                file_size = os.path.getsize(file_path)
-                                print(f"File size: {file_size} bytes")
-                                return unique_filename
-                            else:
-                                print(f"File was not created: {file_path}")
-                                return None
-                        except Exception as e:
-                            print(f"Error saving file {unique_filename}: {e}")
-                            return None
-                else:
-                    print(f"No file found for field: {field_name}")
-                return None
-            
-            # ผู้ช่วยรับค่าช่องทำเครื่องหมาย
-            def get_bool(name):
-                return True if request.form.get(name) else False
+                        unique_filename = f"{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                        file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                        file.save(file_path)
+                        setattr(new_submission, field_name, unique_filename)
 
-            # จัดการข้อมูลตำแหน่งทางวิชาการ
-            academic_position = request.form.get('academicPosition')
-            if academic_position == 'อื่นๆ':
-                academic_position = request.form.get('academicPositionOther', '')
-
-            # จัดการข้อมูลสังกัด
-            affiliation = request.form.get('affiliation')
-            if affiliation == 'อื่นๆ':
-                affiliation = request.form.get('affiliationOther', '')
-
-            # ตรวจสอบและจำกัดค่า page_charge_amount ให้ไม่เกิน 5,000 บาท
-            page_charge_amount = request.form.get('page_charge_amount')
-            if page_charge_amount:
-                try:
-                    page_charge_value = float(page_charge_amount)
-                    if page_charge_value > 5000:
-                        page_charge_amount = '5000'  # จำกัดให้ไม่เกิน 5,000
-                        flash('ค่าธรรมเนียมการตีพิมพ์ถูกปรับเป็น 5,000 บาท ตามเพดานที่กำหนด', 'warning')
-                except ValueError:
-                    pass  # ถ้าแปลงไม่ได้ ให้เก็บค่าเดิม
-
-            new_submission = Submission(
-                # Part 1
-                full_name=request.form.get('fullName'),
-                academic_position=academic_position,
-                affiliation=affiliation,
-                phone=request.form.get('phone'),
-                mobile_phone=request.form.get('mobilePhone'),
-                email=request.form.get('email'),
-
-                # Part 2
-                work_name_th=request.form.get('work_name_th'),
-                work_name_en=request.form.get('work_name_en'),
-                funding_source=request.form.get('funding_source'),
-                fiscal_year=request.form.get('fiscal_year'),
-                project_name=request.form.get('project_name'),
-                qual_1_1=get_bool('qual_1_1'),
-                qual_1_2=get_bool('qual_1_2'),
-                qual_1_3=get_bool('qual_1_3'),
-                scope_2_1=get_bool('scope_2_1'),
-                scope_2_2=get_bool('scope_2_2'),
-                payment_3_1=get_bool('payment_3_1'),
-                page_charge_amount=page_charge_amount,
-                payment_3_2=get_bool('payment_3_2'),
-                payment_3_3=get_bool('payment_3_3'),
-                num_institutes_3_3=request.form.get('num_institutes_3_3'),
-                share_amount_3_3=request.form.get('share_amount_3_3'),
-
-                # Part 4
-                charge_int_checkbox=get_bool('charge_int_checkbox'),
-                charge_int_amount=request.form.get('charge_int_amount'),
-                remuneration_int_checkbox=get_bool('remuneration_int_checkbox'),
-                international_quartile=request.form.get('international_quartile'),
-                share_int_checkbox=get_bool('share_int_checkbox'),
-                share_int_base_amount=request.form.get('share_int_base_amount'),
-                share_int_num_institutes=request.form.get('share_int_num_institutes'),
-                share_int_final_amount=request.form.get('share_int_final_amount'),
-                
-                # Part 5
-                special_nat_checkbox=get_bool('special_nat_checkbox'),
-                special_nat_share_checkbox=get_bool('special_nat_share_checkbox'),
-                special_nat_share_num_institutes=request.form.get('special_nat_share_num_institutes'),
-                special_nat_share_final_amount=request.form.get('special_nat_share_final_amount'),
-                special_int_checkbox=get_bool('special_int_checkbox'),
-                special_international_quartile=request.form.get('special_international_quartile'),
-                special_int_share_checkbox=get_bool('special_int_share_checkbox'),
-                special_int_share_base_amount=request.form.get('special_int_share_base_amount'),
-                special_int_share_num_institutes=request.form.get('special_int_share_num_institutes'),
-                special_int_share_final_amount=request.form.get('special_int_share_final_amount'),
-
-                # Part 6
-                creative_level_asean=get_bool('creative_level_asean'),
-                creative_level_inter_coop=get_bool('creative_level_inter_coop'),
-                creative_level_national=get_bool('creative_level_national'),
-                creative_level_institutional=get_bool('creative_level_institutional'),
-                creative_level_public=get_bool('creative_level_public'),
-
-                # Part 7 (File Uploads)
-                evidence_page_charge_check=get_bool('evidence_page_charge_check'),
-                evidence_page_charge_upload=handle_upload('evidence_page_charge_upload'),
-                evidence_full_paper_check=get_bool('evidence_full_paper_check'),
-                evidence_full_paper_upload=handle_upload('evidence_full_paper_upload'),
-                evidence_consent_letter_check=get_bool('evidence_consent_letter_check'),
-                evidence_consent_letter_upload=handle_upload('evidence_consent_letter_upload'),
-                evidence_quartile_check=get_bool('evidence_quartile_check'),
-                evidence_quartile_upload=handle_upload('evidence_quartile_upload'),
-                evidence_tci_check=get_bool('evidence_tci_check'),
-                evidence_tci_upload=handle_upload('evidence_tci_upload'),
-                evidence_editorial_board_check=get_bool('evidence_editorial_board_check'),
-                evidence_editorial_board_upload=handle_upload('evidence_editorial_board_upload'),
-                evidence_exhibition_check=get_bool('evidence_exhibition_check'),
-                evidence_exhibition_upload=handle_upload('evidence_exhibition_upload'),
-                evidence_proof_check=get_bool('evidence_proof_check'),
-                evidence_proof_upload=handle_upload('evidence_proof_upload'),
-                evidence_nrms_check=get_bool('evidence_nrms_check'),
-                evidence_nrms_upload=handle_upload('evidence_nrms_upload'),
-                evidence_other_check=get_bool('evidence_other_check'),
-                evidence_other_upload=handle_upload('evidence_other_upload'),
-            )
-            
-            print("=== File Upload Results ===")
-            print(f"Page charge: {new_submission.evidence_page_charge_upload}")
-            print(f"Full paper: {new_submission.evidence_full_paper_upload}")
-            print(f"Consent letter: {new_submission.evidence_consent_letter_upload}")
-            print(f"Quartile: {new_submission.evidence_quartile_upload}")
-            print(f"TCI: {new_submission.evidence_tci_upload}")
-            print(f"Editorial board: {new_submission.evidence_editorial_board_upload}")
-            print(f"Exhibition: {new_submission.evidence_exhibition_upload}")
-            print(f"Proof: {new_submission.evidence_proof_upload}")
-            print(f"NRMS: {new_submission.evidence_nrms_upload}")
-            print(f"Other: {new_submission.evidence_other_upload}")
-            
+            # Save to database
             db.session.add(new_submission)
             db.session.commit()
-            
-            # แสดงรายชื่อไฟล์ในโฟลเดอร์ uploads
-            upload_dir = app.config['UPLOAD_FOLDER']
-            if os.path.exists(upload_dir):
-                files_in_upload = os.listdir(upload_dir)
-                print(f"Files in uploads directory: {files_in_upload}")
-            else:
-                print("Upload directory does not exist")
-            
-            return jsonify({'status': 'success', 'message': 'ส่งข้อมูลสำเร็จเรียบร้อยแล้ว!'}), 200
+
+            return jsonify({
+                'status': 'success',
+                'message': f'ส่งข้อมูลสำเร็จ! เลขที่อ้างอิง: ฝวน IRD_06/{new_submission.id:05d}'
+            })
 
         except Exception as e:
-            # กรณีเกิดข้อผิดพลาด ก็ตอบกลับเป็น JSON เช่นกัน
-            print(f"Error on submission: {e}")
-            import traceback
-            traceback.print_exc()
-            return jsonify({'status': 'error', 'message': 'เกิดข้อผิดพลาดในการบันทึกข้อมูล'}), 500
+            db.session.rollback()
+            print(f"Error: {e}")
+            return jsonify({
+                'status': 'error',
+                'message': 'เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง'
+            }), 500
 
     # สำหรับ request แบบ GET ให้แสดงหน้าฟอร์มปกติ
     # ดึงการตั้งค่าหมายเหตุจากฐานข้อมูล
@@ -529,7 +470,7 @@ def download_pdf(submission_id):
 
     def draw_checkbox(text, checked, indent=0):
         usable_width = pdf.w - pdf.l_margin - pdf.r_margin
-        # ตำแหน่งเริ่มต้นในการวาด จะบวกค่าย่อหน้าที่รับเข้ามา
+        # ตำแหน่งเริ่มต้นในการวาด จะบวกค่าย่อหน้าและที่รับเข้ามา
         start_x = pdf.l_margin + indent        
         # บันทึกตำแหน่ง Y ปัจจุบัน
         start_y = pdf.get_y()        
@@ -662,7 +603,8 @@ def download_pdf(submission_id):
     # --- ข้อมูลขอบเขต ---
     scopes = [
         ("2.1", "เป็นบทความวิจัยหรืองานสร้างสรรค์ที่ไม่เคยเผยแพร่ที่ใดมาก่อนหรือเผยแพร่ไม่เกิน 1 ปี หมายเหตุ บทความใดที่ได้ลงตีพิมพ์ในการประชุมวิชาการ และถูกคัดเลือกมาลงในวารสาร (Journal) สามารถขอรับการสนับสนุนได้เพียงอย่างเดียว", s.scope_2_1),
-        ("2.2", "บทความวิจัยที่ขอรับการสนับสนุนต้องไม่เป็นส่วนหนึ่งของผลงานวิจัยที่สำเร็จการศึกษาของผู้รับการสนับสนุนผลงานวิจัย และไม่รวมถึงจดหมายถึงบรรณาธิการ (Letter to editor,Short communication note) หรืองานเขียนขึ้นที่ลักษณะคล้ายกับที่กล่าวข้างต้น", s.scope_2_2)
+        ("2.2", "บทความวิจัยที่ขอรับการสนับสนุนต้องไม่เป็นส่วนหนึ่งของผลงานวิจัยที่สำเร็จการศึกษาของผู้รับการสนับสนุนผลงานวิจัย และไม่รวมถึงจดหมายถึงบรรณาธิการ (Letter to editor,Short communication note) หรืองานเขียนขึ้นที่ลักษณะคล้ายกับที่กล่าวข้างต้น", s.scope_2_2),
+        ("2.3", "บทความวิจัยที่ขอรับการสนับสนุนจะต้องมีผู้เขียนที่ระบุชื่อหน่วยงานของมหาวิทยาลัยเทคโนโลยีราชมงคลธัญบุรีที่ตำแหน่งที่อยู่ของผู้เขียนในบทความวิจัยไม่น้อยกว่าร้อยละ 50", s.scope_2_3)
     ]    
     for number, text, is_checked in scopes:
         # บันทึกตำแหน่ง Y เริ่มต้นของแถว
@@ -740,6 +682,11 @@ def download_pdf(submission_id):
     # --- 4.1 ---
     text_4_1 = f"ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์ (Page charge)... สนับสนุนตามที่จ่ายจริง แต่ไม่เกิน 10,000 บาท ต่อเรื่อง (ระบุ: {s.charge_int_amount or placeholder} บาท)"
     draw_list_item("4.1", text_4_1, s.charge_int_checkbox, indent=item_indent)
+    pdf.ln(2)
+    
+    # --- 4.1.1 ---
+    text_4_1_1 = f"ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์ (Page charge) ในวารสารวิชาการที่ปรากฏในฐานข้อมูลสากลที่อยู่ในกลุ่ม Q1 และ Q2 ให้สนับสนุนตามที่จ่ายจริงหลังหักค่าสมนาคุณการตีพิมพ์บทความวิจัยตามข้อ 4.2 แต่ไม่เกิน 10,000 บาท ต่อเรื่อง (ระบุ: {s.charge_int_q1q2_amount or placeholder} บาท)"
+    draw_list_item("4.1.1", text_4_1_1, s.charge_int_q1q2_checkbox, indent=item_indent)
     pdf.ln(2)
     # --- 4.2 ---
     text_4_2_main = "ค่าสมนาคุณการตีพิมพ์บทความวิจัยในวารสารระดับนานาชาติให้ใช้ค่าควอไทล์ที่ปรากฎใน ฐานข้อมูลการ จัดอันดับวารสาร Scopus โดยพิจารณาจากปีล่าสุดที่ปรากฎอยู่ในฐานข้อมูล ณ วันที่บทความได้รับการ ตีพิมพ์ ดังนี้"
