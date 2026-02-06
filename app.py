@@ -1,13 +1,10 @@
 import os
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, flash
+from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 from werkzeug.utils import secure_filename
 from fpdf import FPDF
-from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, flash, jsonify
-from fpdf.enums import Align
 
 # --- การกำหนดค่า ---
 app = Flask(__name__)
@@ -865,10 +862,6 @@ def get_submission(submission_id):
     # แปลง object datetime เป็น string ก่อนส่ง
     if submission_data.get('created_at'):
         submission_data['created_at'] = submission_data['created_at'].isoformat()
-    if submission_data.get('consent_date'):
-        # ตรวจสอบเพิ่มเติมเผื่อเป็น string อยู่แล้ว
-        if hasattr(submission_data['consent_date'], 'isoformat'):
-            submission_data['consent_date'] = submission_data['consent_date'].isoformat()
 
     return jsonify(submission_data)
 
@@ -931,13 +924,13 @@ def delete_submission(submission_id):
     try:
         db.session.commit()
         
-        # รีเซ็ต AUTO_INCREMENT สำหรับ SQLite
-        max_id_result = db.session.execute(text("SELECT MAX(id) FROM submission")).fetchone()
-        max_id = max_id_result[0] if max_id_result[0] else 0
-        
-        # รีเซ็ต sequence สำหรับ SQLite
-        db.session.execute(text(f"UPDATE sqlite_sequence SET seq = {max_id} WHERE name = 'submission'"))
-        db.session.commit()
+        # รีเซ็ต AUTO_INCREMENT เฉพาะ SQLite
+        if db.engine.dialect.name == 'sqlite':
+            max_id_result = db.session.execute(text("SELECT MAX(id) FROM submission")).fetchone()
+            max_id = max_id_result[0] if max_id_result[0] else 0
+            # รีเซ็ต sequence สำหรับ SQLite
+            db.session.execute(text(f"UPDATE sqlite_sequence SET seq = {max_id} WHERE name = 'submission'"))
+            db.session.commit()
         
         flash('ลบข้อมูลเรียบร้อยแล้ว', 'success')
     except Exception as e:
@@ -1004,7 +997,7 @@ def test_upload():
     </html>
     """
 
-if __name__ == '__main__':
+def initialize_app():
     with app.app_context():
         # สร้างตารางหากไม่มีอยู่จริง
         db.create_all()
@@ -1038,20 +1031,8 @@ if __name__ == '__main__':
 
 if __name__ == '__main__':
     # สำหรับการพัฒนา local
+    initialize_app()
     app.run(debug=True, host='127.0.0.1', port=5000)
 else:
     # สำหรับ production deployment
-    with app.app_context():
-        db.create_all()
-        # Initialize default settings if needed
-        try:
-            existing_setting = Settings.query.filter_by(key='header_note').first()
-            if not existing_setting:
-                default_setting = Settings(
-                    key='header_note', 
-                    value='(สำหรับบทความวิจัยที่ตีพิมพ์เผยแพร่หลังวันที่ 26 กันยายน พ.ศ. 2566)'
-                )
-                db.session.add(default_setting)
-                db.session.commit()
-        except Exception as e:
-            db.session.rollback()
+    initialize_app()

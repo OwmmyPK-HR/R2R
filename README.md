@@ -68,6 +68,79 @@ git push heroku main
    - `SECRET_KEY`: รหัสลับสำหรับ Flask
 3. Deploy อัตโนมัติ
 
+## การตั้งค่า Environment Variables
+
+
+
+
+### ไฟล์ .env (สำหรับ Production)
+สำหรับการ Deploy บน Server ของคุณเอง คุณต้องสร้างไฟล์ `.env` ในโฟลเดอร์ root ของโปรเจค
+
+**ตัวอย่างไฟล์ .env:**
+```bash
+# Flask Configuration
+SECRET_KEY=your-production-secret-key-here-please-change-this
+FLASK_ENV=production
+FLASK_DEBUG=0
+
+# Database Configuration (PostgreSQL for Production)
+DATABASE_URL=postgresql://username:password@hostname:5432/database_name
+
+# Application Settings
+MAX_CONTENT_LENGTH=16777216
+UPLOAD_FOLDER=uploads
+```
+
+### คำอธิบาย Environment Variables
+
+#### Flask Configuration
+- **SECRET_KEY**: คีย์ลับสำหรับการเข้ารหัส session และ cookies
+  - **วิธีสร้าง**: ใช้คำสั่ง `python -c "import secrets; print(secrets.token_hex(32))"`
+  - ⚠️ **สำคัญ**: ต้องเปลี่ยนเป็นค่าใหม่ทุกครั้งในการใช้งาน Production
+- **FLASK_ENV**: สภาพแวดล้อมการทำงาน (`production` หรือ `development`)
+- **FLASK_DEBUG**: เปิด/ปิด Debug Mode (`0` = ปิด, `1` = เปิด) - ต้องปิดใน Production
+
+#### Database Configuration
+- **DATABASE_URL**: URL สำหรับเชื่อมต่อฐานข้อมูล
+  - **PostgreSQL**: `postgresql://username:password@hostname:5432/database_name`
+    - `username`: ชื่อผู้ใช้ฐานข้อมูล
+    - `password`: รหัสผ่านฐานข้อมูล
+    - `hostname`: ที่อยู่เซิร์ฟเวอร์ฐานข้อมูล (เช่น `localhost` หรือ IP address)
+    - `5432`: พอร์ต PostgreSQL (default)
+    - `database_name`: ชื่อฐานข้อมูลที่ต้องการใช้
+  - **SQLite** (ไม่แนะนำใน Production): `sqlite:///database.db`
+  - **Heroku PostgreSQL**: Heroku จะตั้งค่า `DATABASE_URL` ให้อัตโนมัติ
+
+#### Application Settings
+- **MAX_CONTENT_LENGTH**: ขนาดไฟล์สูงสุดที่อนุญาต (bytes) - ค่า default = 16MB
+- **UPLOAD_FOLDER**: โฟลเดอร์สำหรับเก็บไฟล์ที่อัปโหลด
+
+### ⚠️ ข้อควรระวัง
+1. **อย่า commit ไฟล์ .env ลงใน Git**
+   - เพิ่มบรรทัด `.env` และ `*.env` ใน `.gitignore`
+   
+2. **สำหรับ Heroku/Railway**
+   - ไม่ต้องใช้ไฟล์ `.env`
+   - ตั้งค่าผ่าน Dashboard (Config Vars) แทน
+
+3. **สำหรับ Production Server**
+   - ใช้ไฟล์ `.env` หรือตั้งค่า environment variables ในระบบโดยตรง
+   - ตรวจสอบให้แน่ใจว่าไฟล์ `.env` มีสิทธิ์การอ่านที่เหมาะสม (chmod 600)
+
+### การใช้งานไฟล์ .env ในเครื่อง Local
+ถ้าต้องการใช้ไฟล์ `.env` ในการพัฒนาบนเครื่อง Local:
+
+1. ติดตั้ง python-dotenv:
+```bash
+pip install python-dotenv
+```
+
+2. เพิ่มโค้ดใน `app.py`:
+```python
+from dotenv import load_dotenv
+load_dotenv()  # โหลดค่าจากไฟล์ .env
+```
+
 ## การใช้งาน
 
 ### สำหรับผู้ใช้ทั่วไป
