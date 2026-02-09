@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
@@ -396,6 +397,21 @@ def download_pdf(submission_id):
     line_h = 6 # ความสูงมาตรฐานของบรรทัด
     
     # --- Helper Functions (เวอร์ชันสมบูรณ์) ---
+    def format_amount(value):
+        if value is None:
+            return None
+        value_str = str(value).strip()
+        if value_str == '':
+            return None
+        value_str = value_str.replace(',', '')
+        try:
+            amount = Decimal(value_str)
+        except (InvalidOperation, ValueError):
+            return value_str
+        if amount == amount.to_integral():
+            return f"{int(amount):,}"
+        return f"{amount:,.2f}"
+
     def draw_section_title(title):
         pdf.set_font('Sarabun', 'B', 12)
         pdf.cell(0, line_h + 2, title, 0, 1)
@@ -637,9 +653,9 @@ def download_pdf(submission_id):
     # --- สร้างลิสต์ข้อมูลสำหรับส่วนที่ 3 ---
     placeholder = ".........." # ตัวแปรสำหรับเก็บเส้นประ    
     # แก้ไข f-string ให้ใช้ placeholder แทน 'N/A'
-    text_3_1 = f"ค่าธรรมเนียมการตีพิมพ์บทความวิจัย (Page charge) ของวารสารที่อยู่ในฐานข้อมูล TCI ตามที่จ่ายจริงแต่ไม่เกิน 5,000 บาท ต่อเรื่อง (ระบุ: {s.page_charge_amount or placeholder} บาท)"
+    text_3_1 = f"ค่าธรรมเนียมการตีพิมพ์บทความวิจัย (Page charge) ของวารสารที่อยู่ในฐานข้อมูล TCI ตามที่จ่ายจริงแต่ไม่เกิน 5,000 บาท ต่อเรื่อง (ระบุ: {format_amount(s.page_charge_amount) or placeholder} บาท)"
     text_3_2 = "ค่าสมนาคุณการตีพิมพ์บทความวิจัยในวารสารระดับชาติที่อยู่ในฐานข้อมูล TCI กลุ่ม 1 หรือ กลุ่ม 2 จ่ายเงินค่าสมนาคุณการตีพิมพ์บทความวิจัย 4,000 บาท"
-    text_3_3 = f"กรณีผู้ขอรับการสนับสนุนเขียนบทความวิจัยโดยทำงานร่วมกับสถาบันอื่น จะจ่ายค่าสมนาคุณฯตามสัดส่วน ในการรับเงินสนับสนุน 4,000 บาท (คำนวณ: {s.num_institutes_3_3 or placeholder} สถาบัน = {s.share_amount_3_3 or placeholder} บาท)"    
+    text_3_3 = f"กรณีผู้ขอรับการสนับสนุนเขียนบทความวิจัยโดยทำงานร่วมกับสถาบันอื่น จะจ่ายค่าสมนาคุณฯตามสัดส่วน ในการรับเงินสนับสนุน 4,000 บาท (คำนวณ: {format_amount(s.num_institutes_3_3) or placeholder} สถาบัน = {format_amount(s.share_amount_3_3) or placeholder} บาท)"    
     payments_nat = [
         ("3.1", text_3_1, s.payment_3_1),
         ("3.2", text_3_2, s.payment_3_2),
@@ -677,12 +693,12 @@ def download_pdf(submission_id):
     sub_item_indent = 15
     placeholder = ".........."
     # --- 4.1 ---
-    text_4_1 = f"ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์ (Page charge)... สนับสนุนตามที่จ่ายจริง แต่ไม่เกิน 10,000 บาท ต่อเรื่อง (ระบุ: {s.charge_int_amount or placeholder} บาท)"
+    text_4_1 = f"ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์ (Page charge)... สนับสนุนตามที่จ่ายจริง แต่ไม่เกิน 10,000 บาท ต่อเรื่อง (ระบุ: {format_amount(s.charge_int_amount) or placeholder} บาท)"
     draw_list_item("4.1", text_4_1, s.charge_int_checkbox, indent=item_indent)
     pdf.ln(2)
     
     # --- 4.1.1 ---
-    text_4_1_1 = f"ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์ (Page charge) ในวารสารวิชาการที่ปรากฏในฐานข้อมูลสากลที่อยู่ในกลุ่ม Q1 และ Q2 ให้สนับสนุนตามที่จ่ายจริงหลังหักค่าสมนาคุณการตีพิมพ์บทความวิจัยตามข้อ 4.2 แต่ไม่เกิน 10,000 บาท ต่อเรื่อง (ระบุ: {s.charge_int_q1q2_amount or placeholder} บาท)"
+    text_4_1_1 = f"ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์ (Page charge) ในวารสารวิชาการที่ปรากฏในฐานข้อมูลสากลที่อยู่ในกลุ่ม Q1 และ Q2 ให้สนับสนุนตามที่จ่ายจริงหลังหักค่าสมนาคุณการตีพิมพ์บทความวิจัยตามข้อ 4.2 แต่ไม่เกิน 10,000 บาท ต่อเรื่อง (ระบุ: {format_amount(s.charge_int_q1q2_amount) or placeholder} บาท)"
     draw_list_item("4.1.1", text_4_1_1, s.charge_int_q1q2_checkbox, indent=item_indent)
     pdf.ln(2)
     # --- 4.2 ---
@@ -702,7 +718,7 @@ def download_pdf(submission_id):
         draw_list_item("", text, is_selected, symbol_type='radio', indent=sub_item_indent)    
     # --- รายการย่อยของ 4.2 (การหาร) ---
     # แก้ไข f-string ให้ใช้ placeholder
-    text_4_2_share = f"กรณีทำงานร่วมกับสถาบันอื่น (นานาชาติ) จะจ่ายค่าสมนาคุณตามสัดส่วน (คำนวณ: ฐาน {s.share_int_base_amount or placeholder} / {s.share_int_num_institutes or placeholder} สถาบัน = {s.share_int_final_amount or placeholder} บาท)"
+    text_4_2_share = f"กรณีทำงานร่วมกับสถาบันอื่น (นานาชาติ) จะจ่ายค่าสมนาคุณตามสัดส่วน (คำนวณ: ฐาน {format_amount(s.share_int_base_amount) or placeholder} / {format_amount(s.share_int_num_institutes) or placeholder} สถาบัน = {format_amount(s.share_int_final_amount) or placeholder} บาท)"
     # แสดงตัวเลือกการแบ่งสัดส่วนเสมอ
     draw_list_item("", text_4_2_share, s.share_int_checkbox, indent=sub_item_indent)
     pdf.ln(5)
@@ -720,7 +736,7 @@ def download_pdf(submission_id):
     text_5_1_main = "กรณีวารสารระดับชาติและปรากฏในฐานข้อมูลTCI สนับสนุน 1,000 บาท"
     draw_list_item("5.1", text_5_1_main, s.special_nat_checkbox, indent=item_indent)
     # --- รายการย่อยของ 5.1 ---
-    text_5_1_share = f"กรณีผู้ขอรับการสนับสนุนเขียนบทความวิจัยโดยทำงานร่วมกับสถาบันอื่น...ตามสัดส่วน (คำนวณ: 1000 / {s.special_nat_share_num_institutes or placeholder} สถาบัน = {s.special_nat_share_final_amount or placeholder} บาท)"
+    text_5_1_share = f"กรณีผู้ขอรับการสนับสนุนเขียนบทความวิจัยโดยทำงานร่วมกับสถาบันอื่น...ตามสัดส่วน (คำนวณ: 1000 / {format_amount(s.special_nat_share_num_institutes) or placeholder} สถาบัน = {format_amount(s.special_nat_share_final_amount) or placeholder} บาท)"
     # จะแสดงผลก็ต่อเมื่อข้อ 5.1 ถูกเลือก
     if s.special_nat_checkbox:
         draw_list_item("", text_5_1_share, s.special_nat_share_checkbox, indent=sub_item_indent)
@@ -743,7 +759,7 @@ def download_pdf(submission_id):
             is_selected = (s.special_international_quartile == value)
             draw_list_item("", text, is_selected, symbol_type='radio', indent=sub_item_indent)
         # การหารสัดส่วน
-        text_5_2_share = f"กรณีทำงานร่วมกับสถาบันอื่น (นานาชาติ): ฐาน {s.special_int_share_base_amount or placeholder} / {s.special_int_share_num_institutes or placeholder} สถาบัน = {s.special_int_share_final_amount or placeholder} บาท"
+        text_5_2_share = f"กรณีทำงานร่วมกับสถาบันอื่น (นานาชาติ): ฐาน {format_amount(s.special_int_share_base_amount) or placeholder} / {format_amount(s.special_int_share_num_institutes) or placeholder} สถาบัน = {format_amount(s.special_int_share_final_amount) or placeholder} บาท"
         draw_list_item("", text_5_2_share, s.special_int_share_checkbox, indent=sub_item_indent)
     pdf.ln(5)
 
@@ -769,7 +785,7 @@ def download_pdf(submission_id):
     pdf.ln(2)
     # --- รายการย่อย (การหาร) ---
     # แก้ไข f-string ให้ใช้ placeholder แทน 'N/A'
-    text_share = f"กรณีทำงานร่วมกับสถาบันอื่น จะจ่ายค่าสมนาคุณตามสัดส่วน (คำนวณ: ฐาน {s.creative_share_base_amount or placeholder} / {s.creative_share_num_institutes or placeholder} สถาบัน = {s.creative_share_final_amount or placeholder} บาท)"
+    text_share = f"กรณีทำงานร่วมกับสถาบันอื่น จะจ่ายค่าสมนาคุณตามสัดส่วน (คำนวณ: ฐาน {format_amount(s.creative_share_base_amount) or placeholder} / {format_amount(s.creative_share_num_institutes) or placeholder} สถาบัน = {format_amount(s.creative_share_final_amount) or placeholder} บาท)"
     draw_list_item("", text_share, s.creative_share_checkbox, indent=sub_item_indent)    
     pdf.ln(5)
 

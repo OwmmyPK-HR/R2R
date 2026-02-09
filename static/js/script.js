@@ -177,6 +177,8 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
     }
     
     // --- ตรวจสอบเพดานตัวเลข 10,000 บาทสำหรับ International Page charge (4.1) ---
+    // *** ปิดการใช้งานการจำกัดเพดานเงิน - ไม่จำกัดจำนวนเงิน ***
+    /*
     const chargeIntAmountInput = document.getElementById('charge_int_amount');
     if (chargeIntAmountInput) {
         chargeIntAmountInput.addEventListener('input', function() {
@@ -217,6 +219,7 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
             }
         });
     }
+    */
     
     // ==========================================================
     // === ส่วนที่ 3: ระบบ Popup ทั้งหมด (ส่งฟอร์ม, Login)  ===
