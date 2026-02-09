@@ -136,6 +136,73 @@ class Settings(db.Model):
     value = db.Column(db.Text, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+# --- Model สำหรับเก็บ Logs ---
+class Log(db.Model):
+    __tablename__ = 'logs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    level = db.Column(db.String(20))  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    message = db.Column(db.Text, nullable=False)
+    user_id = db.Column(db.String(100), nullable=True)
+    ip_address = db.Column(db.String(50), nullable=True)
+    action = db.Column(db.String(100), nullable=True)  # create, read, update, delete
+    submission_id = db.Column(db.Integer, db.ForeignKey('submission.id'), nullable=True)
+    details = db.Column(db.Text, nullable=True)
+    
+    def __repr__(self):
+        return f'<Log {self.level} - {self.message[:50]}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'timestamp': self.timestamp.isoformat(),
+            'level': self.level,
+            'message': self.message,
+            'user_id': self.user_id,
+            'ip_address': self.ip_address,
+            'action': self.action,
+            'submission_id': self.submission_id,
+            'details': self.details
+        }
+
+# --- Model สำหรับเก็บ Tokens ---
+class Token(db.Model):
+    __tablename__ = 'tokens'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    token = db.Column(db.String(255), unique=True, nullable=False)
+    user_identifier = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
+    last_used = db.Column(db.DateTime, nullable=True)
+    ip_address = db.Column(db.String(50), nullable=True)
+    user_agent = db.Column(db.Text, nullable=True)
+    token_type = db.Column(db.String(50), default='api')  # api, jwt, session
+    
+    def __repr__(self):
+        return f'<Token {self.user_identifier}>'
+    
+    def is_expired(self):
+        """ตรวจสอบว่า token หมดอายุแล้วหรือไม่"""
+        if self.expires_at:
+            return datetime.utcnow() > self.expires_at
+        return False
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'token': self.token[:20] + '...' if len(self.token) > 20 else self.token,
+            'user_identifier': self.user_identifier,
+            'created_at': self.created_at.isoformat(),
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None,
+            'is_active': self.is_active,
+            'last_used': self.last_used.isoformat() if self.last_used else None,
+            'token_type': self.token_type
+        }
+
+
 # --- PDF Generation  ---
 class PDF(FPDF):
     def __init__(self, submission_id=None, *args, **kwargs):
@@ -1044,6 +1111,79 @@ def initialize_app():
     if not os.path.exists('static/fonts'):
         os.makedirs('static/fonts')
         print("Static fonts folder created. Please add Sarabun-Regular.ttf and Sarabun-Bold.ttf")
+
+# ===========================
+# === API Endpoints للتحكم بـ Logs و Tokens ===
+# ===========================
+
+@app.route('/api/logs', methods=['GET'])
+def api_logs():
+    """ดึงข้อมูล logs"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    limit = request.args.get('limit', 100, type=int)
+    level = request.args.get('level', None, type=str)
+    user_id = request.args.get('user_id', None, type=str)
+    
+    query = Log.query
+    
+    if level:
+        query = query.filter_by(level=level.upper())
+    if user_id:
+        query = query.filter_by(user_id=user_id)
+    
+    logs = query.order_by(Log.timestamp.desc()).limit(limit).all()
+    
+    return jsonify([log.to_dict() for log in logs])
+
+@app.route('/api/logs/submission/<int:submission_id>', methods=['GET'])
+def api_logs_by_submission(submission_id):
+    """ดึง logs ที่เกี่ยวข้องกับ submission"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    logs = Log.query.filter_by(submission_id=submission_id).order_by(Log.timestamp.desc()).all()
+    
+    return jsonify([log.to_dict() for log in logs])
+
+@app.route('/api/tokens', methods=['GET'])
+def api_tokens():
+    """ดึงข้อมูล tokens ทั้งหมด"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    tokens = Token.query.filter_by(is_active=True).order_by(Token.created_at.desc()).all()
+    
+    return jsonify([token.to_dict() for token in tokens])
+
+@app.route('/api/tokens/<int:token_id>', methods=['DELETE'])
+def api_revoke_token(token_id):
+    """ยกเลิก token"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    token = Token.query.get_or_404(token_id)
+    token.is_active = False
+    db.session.commit()
+    
+    return jsonify({'status': 'success', 'message': 'Token ยกเลิกสำเร็จ'})
+
+@app.route('/api/tokens/cleanup', methods=['POST'])
+def api_cleanup_tokens():
+    """ลบ tokens ที่หมดอายุ"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    now = datetime.utcnow()
+    expired_tokens = Token.query.filter(
+        Token.expires_at < now,
+        Token.is_active == True
+    ).delete()
+    
+    db.session.commit()
+    
+    return jsonify({'status': 'success', 'deleted': expired_tokens})
 
 if __name__ == '__main__':
     # สำหรับการพัฒนา local

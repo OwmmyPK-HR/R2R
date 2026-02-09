@@ -43,6 +43,8 @@ def init_database():
             print("\nตารางที่ถูกสร้าง:")
             print("  1. submission  - เก็บข้อมูลการยื่นคำขอ")
             print("  2. settings    - เก็บการตั้งค่าระบบ")
+            print("  3. logs        - เก็บบันทึกการทำงานของระบบ")
+            print("  4. tokens      - เก็บ API tokens สำหรับการยืนยันตัวตน")
             
             # ตรวจสอบว่าตารางถูกสร้างแล้ว
             from sqlalchemy import inspect

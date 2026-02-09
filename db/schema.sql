@@ -102,8 +102,42 @@ CREATE TABLE IF NOT EXISTS settings (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ตาราง logs: เก็บบันทึกการทำงานของระบบ
+CREATE TABLE IF NOT EXISTS logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    level VARCHAR(20),
+    message TEXT NOT NULL,
+    user_id VARCHAR(100),
+    ip_address VARCHAR(50),
+    action VARCHAR(100),
+    submission_id INTEGER,
+    details TEXT,
+    FOREIGN KEY(submission_id) REFERENCES submission(id)
+);
+
+-- ตาราง tokens: เก็บ API tokens สำหรับการยืนยันตัวตน
+CREATE TABLE IF NOT EXISTS tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token VARCHAR(255) UNIQUE NOT NULL,
+    user_identifier VARCHAR(100) NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME,
+    is_active BOOLEAN DEFAULT 1,
+    last_used DATETIME,
+    ip_address VARCHAR(50),
+    user_agent TEXT,
+    token_type VARCHAR(50) DEFAULT 'api'
+);
+
 -- สร้าง Index เพื่อเพิ่มประสิทธิภาพการค้นหา
 CREATE INDEX IF NOT EXISTS idx_submission_created_at ON submission(created_at);
 CREATE INDEX IF NOT EXISTS idx_submission_email ON submission(email);
 CREATE INDEX IF NOT EXISTS idx_submission_fiscal_year ON submission(fiscal_year);
 CREATE INDEX IF NOT EXISTS idx_settings_key ON settings(key);
+CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
+CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level);
+CREATE INDEX IF NOT EXISTS idx_logs_user_id ON logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_tokens_token ON tokens(token);
+CREATE INDEX IF NOT EXISTS idx_tokens_user_identifier ON tokens(user_identifier);
+CREATE INDEX IF NOT EXISTS idx_tokens_is_active ON tokens(is_active);
