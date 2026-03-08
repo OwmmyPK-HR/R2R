@@ -295,18 +295,17 @@
                     </div>
                     </div>
                 <hr class="section-divider">
-                    <div class="checkbox-group vertical-input-group">
-                    <div class="main-label-line">
+                    <div class="checkbox-group">
                         <input type="checkbox" id="special_int_checkbox" name="special_int_checkbox" value="true">
                         <label for="special_int_checkbox">5.2 กรณีวารสารระดับนานาชาติและปรากฏในฐานข้อมูลสากล สนับสนุน 1 ใน 4 ของข้อ 4.2 ดังนี้ </label>
                     </div>
-                    <div class="input-line sub-options-line">
-                    <div class="radio-group"><input type="radio" name="special_international_quartile" value="top10" data-amount="15000"><label>Top 10% หรือ Tier 1 สนับสนุน 15,000</label></div>
-                    <div class="radio-group"><input type="radio" name="special_international_quartile" value="q1" data-amount="7500"><label>Q1 สนับสนุน 7,500</label></div>
-                    <div class="radio-group"><input type="radio" name="special_international_quartile" value="q2" data-amount="5000"><label>Q2 สนับสนุน 5,000</label></div>
-                    <div class="radio-group"><input type="radio" name="special_international_quartile" value="q3" data-amount="2500"><label>Q3 สนับสนุน 2,500</label></div>
-                    <div class="radio-group"><input type="radio" name="special_international_quartile" value="q4" data-amount="2000"><label>Q4 สนับสนุน 2,000</label></div>
-                    <div class="radio-group"><input type="radio" name="special_international_quartile" value="none" data-amount="1000"><label>ไม่มี สนับสนุน 1,000</label></div>
+                    <div class="sub-options">
+                    <div class="radio-group"><input type="radio" name="special_international_quartile" value="top10" data-amount="15000"><label>Top 10% หรือ Tier 1 สนับสนุน 15,000 บาท</label></div>
+                    <div class="radio-group"><input type="radio" name="special_international_quartile" value="q1" data-amount="7500"><label> ควอไทล์ที่ 1 (Q1) สนับสนุน 7,500 บาท</label></div>
+                    <div class="radio-group"><input type="radio" name="special_international_quartile" value="q2" data-amount="5000"><label> ควอไทล์ที่ 2 (Q2) สนับสนุน 5,000 บาท</label></div>
+                    <div class="radio-group"><input type="radio" name="special_international_quartile" value="q3" data-amount="2500"><label> ควอไทล์ที่ 3 (Q3) สนับสนุน 2,500 บาท</label></div>
+                    <div class="radio-group"><input type="radio" name="special_international_quartile" value="q4" data-amount="2000"><label> ควอไทล์ที่ 4 (Q4) สนับสนุน 2,000 บาท</label></div>
+                    <div class="radio-group"><input type="radio" name="special_international_quartile" value="none" data-amount="1000"><label>ไม่มีควอไทล์ สนับสนุน 1,000 บาท</label></div>
                     </div>
                     <div class="checkbox-group vertical-input-group">
                     <div class="main-label-line">
@@ -321,7 +320,7 @@
                         <span>=</span>
                         <input type="text" id="special_int_share_final_amount" name="special_int_share_final_amount" placeholder="ผลลัพธ์" class="input-sm" readonly>
                         <span>บาท</span>
-                    </div>                    
+                    </div>
                     </div>
                     <p class="form-note"> <B>หมายเหตุ</B> {{ form_notes.special_int_share }} </p>                    
                 </fieldset>

@@ -802,10 +802,12 @@ input[type="checkbox"], input[type="radio"] {
 /* ทำให้กลุ่ม radio button ที่ย่อหน้าเข้ามามีการขึ้นบรรทัดใหม่ได้ */
 .sub-options-line {
     flex-wrap: wrap;
-    width: 50%;
+    width: 100%;
+    padding-left: 0;
 }
 .sub-options-line .radio-group {
-    margin-right: 5rem; /* เพิ่มระยะห่างระหว่าง radio button */
+    margin-right: 0;
+    flex: 1 1 320px;
 }
 
 /* =================================================== */
