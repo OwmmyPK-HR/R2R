@@ -185,12 +185,12 @@
                     <div class="main-label-line">
                         <input type="checkbox" id="payment_3_3" name="payment_3_3" value="true">
                         <label for="payment_3_3">3.3 กรณีผู้ขอรับการสนับสนุนเขียนบทความวิจัยโดยทำงานร่วมกับสถาบันอื่น จะจ่ายค่าสมนาคุณตามสัดส่วน 
-                                                     (4,000 บาท ÷ จำนวนสถาบัน)</label>
+                                                     (4,000 บาท ÷ จำนวนสถาบันทั้งหมด)</label>
                     </div>
                     <div class="input-line">
-                        <label class="sub-label" for="num_institutes_3_3">สถาบัน:</label>
+                        <label class="sub-label" for="num_institutes_3_3">จำนวนสถาบันทั้งหมด:</label>
                         <input type="number" id="num_institutes_3_3" name="num_institutes_3_3" placeholder="0" class="inline-input-small">
-                        <span>จำนวน</span> <span>=</span> 
+                        <span>สถาบัน</span> <span>=</span> 
                         <input type="text" id="share_amount_3_3" name="share_amount_3_3" class="inline-input-small" readonly>
                         <span>บาท</span>
                     </div>                        
@@ -236,9 +236,9 @@
                     </div>
                     <div class="input-line">
                         <label class="sub-label">คำนวณ:</label>
-                        <input type="text" id="share_int_base_amount" name="share_int_base_amount" placeholder="เงินฐาน" class="inline-input-small" readonly>
+                        <input type="text" id="share_int_base_amount" name="share_int_base_amount" placeholder="เงินฐาน" class="input-sm" readonly>
                         <span>÷</span>
-                        <input type="number" id="share_int_num_institutes" name="share_int_num_institutes" placeholder="สถาบัน" class="inline-input-small">
+                        <input type="number" id="share_int_num_institutes" name="share_int_num_institutes" placeholder="จำนวนสถาบันทั้งหมด" class="inline-input-small">
                         <span>=</span>
                         <input type="text" id="share_int_final_amount" name="share_int_final_amount" placeholder="ผลลัพธ์" class="inline-input-small" readonly>
                         <span>บาท</span>
@@ -288,7 +288,7 @@
                         จะจ่ายค่าสมนาคุณการเผยแพร่ผลงานวิจัยหรืองานสร้างสรรค์ตามสัดส่วน ในการรับเงินสนับสนุน </label>
                     </div>
                     <div class="complex-input-group">
-                        <input type="number" id="special_nat_share_num_institutes" name="special_nat_share_num_institutes" placeholder="สถาบัน" class="adjustable-input">
+                        <input type="number" id="special_nat_share_num_institutes" name="special_nat_share_num_institutes" placeholder="จำนวนสถาบันทั้งหมด" class="adjustable-input">
                         <span>=</span>
                         <input type="text" id="special_nat_share_final_amount" name="special_nat_share_final_amount" placeholder="ผลลัพธ์" class="inline-input-small" readonly>
                         <span>บาท</span>
@@ -317,7 +317,7 @@
                         <label class="sub-label">คำนวณ:</label>
                         <input type="text" id="special_int_share_base_amount" name="special_int_share_base_amount" placeholder="เงินฐาน" class="input-sm" readonly>
                         <span>÷</span>
-                        <input type="number" id="special_int_share_num_institutes" name="special_int_share_num_institutes" placeholder="สถาบัน" class="input-xs">
+                        <input type="number" id="special_int_share_num_institutes" name="special_int_share_num_institutes" placeholder="จำนวนสถาบันทั้งหมด" class="input-xs">
                         <span>=</span>
                         <input type="text" id="special_int_share_final_amount" name="special_int_share_final_amount" placeholder="ผลลัพธ์" class="input-sm" readonly>
                         <span>บาท</span>
@@ -343,7 +343,7 @@
                         <label class="sub-label">คำนวณ:</label>
                         <input type="text" id="creative_share_base_amount" name="creative_share_base_amount" placeholder="เงินฐาน" class="input-sm" readonly>
                         <span>÷</span>
-                        <input type="number" id="creative_share_num_institutes" name="creative_share_num_institutes" placeholder="สถาบัน" class="input-xs">
+                        <input type="number" id="creative_share_num_institutes" name="creative_share_num_institutes" placeholder="จำนวนสถาบันทั้งหมด" class="input-xs">
                         <span>=</span>
                         <input type="text" id="creative_share_final_amount" name="creative_share_final_amount" placeholder="ผลลัพธ์" class="input-sm" readonly>
                         <span>บาท</span>

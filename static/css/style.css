@@ -853,6 +853,14 @@ input[type="checkbox"], input[type="radio"] {
     flex-shrink: 0 !important;
 }
 
+/* ขยายเฉพาะช่องที่ใช้ข้อความ placeholder "จำนวนสถาบันทั้งหมด" */
+#share_int_num_institutes,
+#special_nat_share_num_institutes,
+#special_int_share_num_institutes,
+#creative_share_num_institutes {
+    width: 220px !important;
+}
+
 /* ขนาดเล็ก (Small) */
 .input-sm {
     width: 120px !important;

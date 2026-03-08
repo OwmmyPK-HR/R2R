@@ -1,5 +1,33 @@
 document.addEventListener('DOMContentLoaded', function() {
 
+    function bindRadioGroupToMainCheckbox(mainCheckboxId, radioName, onChangeCallback) {
+        const mainCheckbox = document.getElementById(mainCheckboxId);
+        const radioButtons = document.querySelectorAll(`input[name="${radioName}"]`);
+
+        if (!mainCheckbox || radioButtons.length === 0) {
+            return;
+        }
+
+        function updateRadioAvailability() {
+            const isEnabled = mainCheckbox.checked;
+
+            radioButtons.forEach(radio => {
+                radio.disabled = !isEnabled;
+
+                if (!isEnabled) {
+                    radio.checked = false;
+                }
+            });
+
+            if (typeof onChangeCallback === 'function') {
+                onChangeCallback();
+            }
+        }
+
+        mainCheckbox.addEventListener('change', updateRadioAvailability);
+        updateRadioAvailability();
+    }
+
     // ==========================================================
     // === ส่วนที่ 1: การคำนวณอัตโนมัติทั้งหมดในฟอร์ม        ===
     // ==========================================================
@@ -7,24 +35,50 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Calculation for Section 3.3 ---
     const numInstitutesInput = document.getElementById('num_institutes_3_3');
     const shareAmountOutput = document.getElementById('share_amount_3_3');
+    const payment33Checkbox = document.getElementById('payment_3_3');
     if (numInstitutesInput && shareAmountOutput) {
-        numInstitutesInput.addEventListener('input', function() {
-            const numInstitutes = parseInt(this.value, 10);
+        function calculateSection33Share() {
+            if (!payment33Checkbox || !payment33Checkbox.checked) {
+                shareAmountOutput.value = '';
+                return;
+            }
+
+            const numInstitutes = parseInt(numInstitutesInput.value, 10);
             if (numInstitutes > 0) {
                 shareAmountOutput.value = (4000 / numInstitutes).toFixed(2);
             } else {
                 shareAmountOutput.value = '';
             }
-        });
+        }
+
+        function updateSection33Availability() {
+            const isEnabled = !!(payment33Checkbox && payment33Checkbox.checked);
+            numInstitutesInput.disabled = !isEnabled;
+
+            if (!isEnabled) {
+                shareAmountOutput.value = '';
+            }
+
+            calculateSection33Share();
+        }
+
+        numInstitutesInput.addEventListener('input', calculateSection33Share);
+        if (payment33Checkbox) {
+            payment33Checkbox.addEventListener('change', updateSection33Availability);
+        }
+
+        updateSection33Availability();
     }
 
     // --- Calculation for Section 4.2 ---
     const intQuartileRadios = document.querySelectorAll('input[name="international_quartile"]');
+    const remunerationIntCheckbox = document.getElementById('remuneration_int_checkbox');
     const chargeIntCheckbox = document.getElementById('charge_int_checkbox');
     const chargeIntAmountInput = document.getElementById('charge_int_amount');
     const shareIntBaseAmountInput = document.getElementById('share_int_base_amount');
     const shareIntNumInstitutesInput = document.getElementById('share_int_num_institutes');
     const shareIntFinalAmountOutput = document.getElementById('share_int_final_amount');
+    const shareIntCheckbox = document.getElementById('share_int_checkbox');
     const int42SelectedAmountInput = document.getElementById('int_42_selected_amount');
     const int42ActualUsedAmountInput = document.getElementById('int_42_actual_used_amount');
     const int42ResultAmountOutput = document.getElementById('int_42_result_amount');
@@ -50,6 +104,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!shareIntBaseAmountInput || !shareIntNumInstitutesInput || !shareIntFinalAmountOutput) {
             return;
         }
+
+        // Calculate only when user selects the share-by-institutes option.
+        if (!shareIntCheckbox || !shareIntCheckbox.checked) {
+            shareIntFinalAmountOutput.value = '';
+            return;
+        }
+
         const baseAmount = parseFloat(shareIntBaseAmountInput.value) || 0;
         const numInstitutes = parseInt(shareIntNumInstitutesInput.value, 10) || 0;
         if (baseAmount > 0 && numInstitutes > 0) {
@@ -57,6 +118,24 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             shareIntFinalAmountOutput.value = '';
         }
+    }
+
+    function updateIntShareAvailability() {
+        if (!shareIntNumInstitutesInput || !shareIntFinalAmountOutput || !shareIntBaseAmountInput) {
+            return;
+        }
+
+        const isEnabled = !!(shareIntCheckbox && shareIntCheckbox.checked);
+        shareIntNumInstitutesInput.disabled = !isEnabled;
+
+        if (!isEnabled) {
+            shareIntBaseAmountInput.value = '';
+            shareIntFinalAmountOutput.value = '';
+        } else {
+            syncSection42BaseAmountFromSelectedRadio();
+        }
+
+        calculateIntShare();
     }
 
     function calculateInt42Result() {
@@ -132,7 +211,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const amount = selectedRadio ? (selectedRadio.dataset.amount || '') : '';
 
         if (shareIntBaseAmountInput) {
-            shareIntBaseAmountInput.value = amount;
+            // Use base amount for share calculation only when share option is checked.
+            shareIntBaseAmountInput.value = (shareIntCheckbox && shareIntCheckbox.checked) ? amount : '';
         }
         if (int42SelectedAmountInput) {
             int42SelectedAmountInput.value = amount;
@@ -150,6 +230,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (shareIntNumInstitutesInput) {
         shareIntNumInstitutesInput.addEventListener('input', calculateIntShare);
     }
+    if (shareIntCheckbox) {
+        shareIntCheckbox.addEventListener('change', updateIntShareAvailability);
+    }
     if (chargeIntCheckbox) {
         chargeIntCheckbox.addEventListener('change', calculateInt41Result);
     }
@@ -160,25 +243,82 @@ document.addEventListener('DOMContentLoaded', function() {
         int42ActualUsedAmountInput.addEventListener('input', calculateInt42Result);
     }
 
+    function updateChargeIntAvailability() {
+        if (!chargeIntAmountInput) {
+            return;
+        }
+
+        const isEnabled = !!(chargeIntCheckbox && chargeIntCheckbox.checked);
+        chargeIntAmountInput.disabled = !isEnabled;
+
+        if (!isEnabled) {
+            chargeIntAmountInput.value = '';
+        }
+
+        calculateInt41Result();
+    }
+
+    if (chargeIntCheckbox) {
+        chargeIntCheckbox.addEventListener('change', updateChargeIntAvailability);
+    }
+
     syncSection42BaseAmountFromSelectedRadio();
+    updateChargeIntAvailability();
+    updateIntShareAvailability();
     calculateIntShare();
     calculateInt42Result();
     calculateInt41Result();
     adjustInt42ResultWidth();
     adjustInt41ResultWidth();
 
+    if (remunerationIntCheckbox && intQuartileRadios.length > 0) {
+        bindRadioGroupToMainCheckbox(
+            'remuneration_int_checkbox',
+            'international_quartile',
+            function() {
+                syncSection42BaseAmountFromSelectedRadio();
+                calculateIntShare();
+                calculateInt42Result();
+            }
+        );
+    }
+
     // --- Calculation for Section 5.1 ---
     const specialNatNumInstitutesInput = document.getElementById('special_nat_share_num_institutes');
     const specialNatFinalAmountOutput = document.getElementById('special_nat_share_final_amount');
+    const specialNatShareCheckbox = document.getElementById('special_nat_share_checkbox');
     if (specialNatNumInstitutesInput && specialNatFinalAmountOutput) {
-        specialNatNumInstitutesInput.addEventListener('input', function() {
-            const numInstitutes = parseInt(this.value, 10);
+        function calculateSpecialNatShare() {
+            if (!specialNatShareCheckbox || !specialNatShareCheckbox.checked) {
+                specialNatFinalAmountOutput.value = '';
+                return;
+            }
+
+            const numInstitutes = parseInt(specialNatNumInstitutesInput.value, 10);
             if (numInstitutes > 0) {
                 specialNatFinalAmountOutput.value = (1000 / numInstitutes).toFixed(2);
             } else {
                 specialNatFinalAmountOutput.value = '';
             }
-        });
+        }
+
+        function updateSpecialNatShareAvailability() {
+            const isEnabled = !!(specialNatShareCheckbox && specialNatShareCheckbox.checked);
+            specialNatNumInstitutesInput.disabled = !isEnabled;
+
+            if (!isEnabled) {
+                specialNatFinalAmountOutput.value = '';
+            }
+
+            calculateSpecialNatShare();
+        }
+
+        specialNatNumInstitutesInput.addEventListener('input', calculateSpecialNatShare);
+        if (specialNatShareCheckbox) {
+            specialNatShareCheckbox.addEventListener('change', updateSpecialNatShareAvailability);
+        }
+
+        updateSpecialNatShareAvailability();
     }
 
     // --- Calculation for Section 5.2 ---
@@ -186,8 +326,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const specialIntBaseAmountInput = document.getElementById('special_int_share_base_amount');
     const specialIntNumInstitutesInput = document.getElementById('special_int_share_num_institutes');
     const specialIntFinalAmountOutput = document.getElementById('special_int_share_final_amount');
+    const specialIntShareCheckbox = document.getElementById('special_int_share_checkbox');
     if (specialIntQuartileRadios.length > 0 && specialIntBaseAmountInput && specialIntNumInstitutesInput && specialIntFinalAmountOutput) {
+        function syncSpecialIntBaseAmountFromSelectedRadio() {
+            const selectedRadio = document.querySelector('input[name="special_international_quartile"]:checked');
+            const amount = selectedRadio ? (selectedRadio.dataset.amount || '') : '';
+
+            // Use base amount only when the share-by-institutes option is checked.
+            specialIntBaseAmountInput.value = (specialIntShareCheckbox && specialIntShareCheckbox.checked) ? amount : '';
+        }
+
         function calculateSpecialIntShare() {
+            if (!specialIntShareCheckbox || !specialIntShareCheckbox.checked) {
+                specialIntFinalAmountOutput.value = '';
+                return;
+            }
+
             const baseAmount = parseFloat(specialIntBaseAmountInput.value) || 0;
             const numInstitutes = parseInt(specialIntNumInstitutesInput.value, 10) || 0;
             if (baseAmount > 0 && numInstitutes > 0) {
@@ -196,26 +350,61 @@ document.addEventListener('DOMContentLoaded', function() {
                 specialIntFinalAmountOutput.value = '';
             }
         }
-        specialIntQuartileRadios.forEach(radio => radio.addEventListener('change', function() {
-            if (this.checked) {
-                specialIntBaseAmountInput.value = this.dataset.amount;
-                calculateSpecialIntShare();
+
+        function updateSpecialIntShareAvailability() {
+            const isEnabled = !!(specialIntShareCheckbox && specialIntShareCheckbox.checked);
+            specialIntNumInstitutesInput.disabled = !isEnabled;
+
+            if (!isEnabled) {
+                specialIntBaseAmountInput.value = '';
+                specialIntFinalAmountOutput.value = '';
+            } else {
+                syncSpecialIntBaseAmountFromSelectedRadio();
             }
+
+            calculateSpecialIntShare();
+        }
+
+        specialIntQuartileRadios.forEach(radio => radio.addEventListener('change', function() {
+            syncSpecialIntBaseAmountFromSelectedRadio();
+            calculateSpecialIntShare();
         }));
         specialIntNumInstitutesInput.addEventListener('input', calculateSpecialIntShare);
+        if (specialIntShareCheckbox) {
+            specialIntShareCheckbox.addEventListener('change', updateSpecialIntShareAvailability);
+        }
+
+        bindRadioGroupToMainCheckbox(
+            'special_int_checkbox',
+            'special_international_quartile',
+            function() {
+                syncSpecialIntBaseAmountFromSelectedRadio();
+                calculateSpecialIntShare();
+            }
+        );
+
+        syncSpecialIntBaseAmountFromSelectedRadio();
+        updateSpecialIntShareAvailability();
     }
 
     // --- Calculation for Section 6 ---
+
     const creativeCheckboxes = document.querySelectorAll('input[name^="creative_level_"]');
     const creativeBaseAmountInput = document.getElementById('creative_share_base_amount');
     const creativeNumInstitutesInput = document.getElementById('creative_share_num_institutes');
     const creativeFinalAmountOutput = document.getElementById('creative_share_final_amount');
+    const creativeShareCheckbox = document.getElementById('creative_share_checkbox');
 
 // 2. ตรวจสอบให้แน่ใจว่า element ทั้งหมดมีอยู่จริง
 if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInstitutesInput && creativeFinalAmountOutput) {
 
     // 3. ฟังก์ชันสำหรับคำนวณการหาร (เหมือนเดิม)
     function calculateCreativeShare() {
+        if (!creativeShareCheckbox || !creativeShareCheckbox.checked) {
+            creativeFinalAmountOutput.value = '';
+            return;
+        }
+
         const baseAmount = parseFloat(creativeBaseAmountInput.value) || 0;
         const numInstitutes = parseInt(creativeNumInstitutesInput.value, 10) || 0;
 
@@ -237,8 +426,12 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
                 totalAmount += parseFloat(checkbox.dataset.amount) || 0;
             }
         });
-        // อัปเดตค่าในช่อง "เงินฐาน"
-        creativeBaseAmountInput.value = totalAmount;
+        // อัปเดตค่าในช่อง "เงินฐาน" เฉพาะเมื่อเลือกคำนวณตามสัดส่วน
+        if (creativeShareCheckbox && creativeShareCheckbox.checked) {
+            creativeBaseAmountInput.value = totalAmount;
+        } else {
+            creativeBaseAmountInput.value = '';
+        }
         
         // เมื่อเงินฐานเปลี่ยน ให้คำนวณการหารใหม่ทันที
         calculateCreativeShare();
@@ -252,6 +445,26 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
 
     // 6. เพิ่ม Event Listener ให้กับช่องกรอกจำนวนสถาบัน (เหมือนเดิม)
     creativeNumInstitutesInput.addEventListener('input', calculateCreativeShare);
+
+    function updateCreativeShareAvailability() {
+        const isEnabled = !!(creativeShareCheckbox && creativeShareCheckbox.checked);
+        creativeNumInstitutesInput.disabled = !isEnabled;
+
+        if (!isEnabled) {
+            creativeBaseAmountInput.value = '';
+            creativeFinalAmountOutput.value = '';
+        } else {
+            updateCreativeBaseAmount();
+        }
+
+        calculateCreativeShare();
+    }
+
+    if (creativeShareCheckbox) {
+        creativeShareCheckbox.addEventListener('change', updateCreativeShareAvailability);
+    }
+
+    updateCreativeShareAvailability();
     }
 
     // ==========================================================
@@ -281,8 +494,18 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
     }
     
     // --- ตรวจสอบเพดานตัวเลข 9,999,999 บาทสำหรับ Page charge (3.1) ---
+    const payment31Checkbox = document.getElementById('payment_3_1');
     const pageChargeAmountInput = document.getElementById('page_charge_amount');
     if (pageChargeAmountInput) {
+        function updatePageChargeAvailability() {
+            const isEnabled = !!(payment31Checkbox && payment31Checkbox.checked);
+            pageChargeAmountInput.disabled = !isEnabled;
+
+            if (!isEnabled) {
+                pageChargeAmountInput.value = '';
+            }
+        }
+
         pageChargeAmountInput.addEventListener('input', function() {
             const value = parseFloat(this.value);
             if (value > 9999999) {
@@ -299,6 +522,12 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
                 this.value = 9999999;
             }
         });
+
+        if (payment31Checkbox) {
+            payment31Checkbox.addEventListener('change', updatePageChargeAvailability);
+        }
+
+        updatePageChargeAvailability();
     }
     
     // --- ตรวจสอบเพดานตัวเลข 10,000 บาทสำหรับ International Page charge (4.1) ---
