@@ -492,7 +492,8 @@ def download_pdf(submission_id):
     # ส่ง submission_id ไปยัง PDF class
     pdf = PDF(submission_id=submission_id, orientation='P', unit='mm', format='A4')
     pdf.add_page()    
-    line_h = 6 # ความสูงมาตรฐานของบรรทัด
+    line_h = 6.2 # ความสูงมาตรฐานของบรรทัด
+    underline_offset = 0.1
     
     # --- Helper Functions (เวอร์ชันสมบูรณ์) ---
     def format_amount(value):
@@ -514,6 +515,7 @@ def download_pdf(submission_id):
         pdf.set_font('Sarabun', 'B', 12)
         pdf.cell(0, line_h + 2, title, 0, 1)
         pdf.ln(2)
+        pdf.ln(2)
     
     def _draw_symbol(x, y, h, symbol_type, is_checked):
         # ฟังก์ชันย่อยใหม่สำหรับวาดสัญลักษณ์โดยเฉพาะ
@@ -530,7 +532,28 @@ def download_pdf(submission_id):
             symbol = '◉' if is_checked else '○'
             pdf.cell(box_size, h, symbol, 0, 0, 'C')
 
-    def draw_list_item(number, text, is_checked, symbol_type='checkbox', indent=5):
+    def draw_list_item(number, text, is_checked, symbol_type='checkbox', indent=5, gap_after=2):
+        def _estimate_lines(content, max_width):
+            content = str(content or '')
+            if not content:
+                return 1
+            total_lines = 0
+            for paragraph in content.split('\n'):
+                if paragraph == '':
+                    total_lines += 1
+                    continue
+                current_line = ''
+                for ch in paragraph:
+                    candidate = f"{current_line}{ch}"
+                    if current_line and pdf.get_string_width(candidate) > max_width:
+                        total_lines += 1
+                        current_line = ch
+                    else:
+                        current_line = candidate
+                if current_line:
+                    total_lines += 1
+            return max(1, total_lines)
+
         start_y = pdf.get_y()
         start_x = pdf.l_margin + indent        
         # 1. วาดลำดับข้อ
@@ -540,6 +563,26 @@ def download_pdf(submission_id):
         # 2. วาดสัญลักษณ์ (Checkbox หรือ Radio)
         symbol_x = pdf.get_x()
         box_size = 4
+        text_x = symbol_x + box_size + 2
+        usable_width = pdf.w - pdf.r_margin - text_x
+        estimated_lines = _estimate_lines(text, usable_width)
+        estimated_height = max(line_h * 1.2, estimated_lines * line_h) + gap_after + 2
+        near_page_end = pdf.get_y() > (pdf.page_break_trigger - (line_h * 3))
+        need_break = near_page_end or (pdf.get_y() + estimated_height > pdf.page_break_trigger)
+        if hasattr(pdf, 'will_page_break'):
+            need_break = need_break or pdf.will_page_break(estimated_height + line_h)
+
+        if need_break:
+            pdf.add_page()
+            start_y = pdf.get_y()
+            start_x = pdf.l_margin + indent
+            pdf.set_font('Sarabun', '', 10)
+            pdf.set_x(start_x)
+            pdf.cell(10, line_h, number, 0, 0)
+            symbol_x = pdf.get_x()
+            text_x = symbol_x + box_size + 2
+            usable_width = pdf.w - pdf.r_margin - text_x
+
         # จัดตำแหน่งสัญลักษณ์ให้อยู่กึ่งกลางแนวตั้งของบรรทัด
         symbol_y_pos = start_y + (line_h / 2)        
         if symbol_type == 'checkbox':
@@ -559,25 +602,76 @@ def download_pdf(submission_id):
                 pdf.circle(center_x_of_symbol, symbol_y_pos, radius * 1, 'F')
         # 3. วาดข้อความ
         pdf.set_font('Sarabun', '', 10)
-        text_x = symbol_x + box_size + 2
         pdf.set_xy(text_x, start_y)        
-        usable_width = pdf.w - pdf.r_margin - text_x
         pdf.multi_cell(usable_width, line_h, text, align='L')        
-        pdf.ln(3)
+        pdf.ln(gap_after)
 
     def draw_full_width_field(label, data):
         # บันทึกตำแหน่ง Y เริ่มต้นของบรรทัด
         start_y = pdf.get_y()
+        clean_label = (label or '').rstrip()
+        label_width = max(45, min(70, pdf.get_string_width(clean_label) + 4))
+        value_prefix = ' ' if clean_label.endswith(':') else ': '
         # วาด Label
         pdf.set_font('Sarabun', 'B', 11)
-        pdf.cell(45, line_h, label, 0, 0)
+        pdf.cell(label_width, line_h, clean_label, 0, 0)
         pdf.set_font('Sarabun', '', 11)
-        # --- จุดที่แก้ไข: เปลี่ยน or '' เป็น or ' ' ---
-        # ใช้ multi_cell เพื่อรองรับข้อความยาวๆ และใช้ ' ' เป็นค่าสำรอง
-        pdf.multi_cell(0, line_h, f": {data or ' '}", border='B', align='L')
-        y_after = pdf.get_y()
-        pdf.set_y(max(start_y + line_h, y_after))
+        value_start_x = pdf.get_x()
+        pdf.cell(0, line_h, f"{value_prefix}{data or ' '}", border=0, ln=1, align='L')
+        draw_dotted_underline(value_start_x, pdf.w - pdf.r_margin, start_y + line_h + underline_offset)
+        pdf.set_y(max(start_y + line_h, pdf.get_y()))
         pdf.ln(3)
+
+    def draw_dotted_underline(x1, x2, y):
+        if hasattr(pdf, 'dashed_line'):
+            pdf.dashed_line(x1, y, x2, y, dash_length=0.6, space_length=0.8)
+        elif hasattr(pdf, 'set_dash_pattern'):
+            pdf.set_dash_pattern(dash=0.6, gap=0.8)
+            pdf.line(x1, y, x2, y)
+            pdf.set_dash_pattern(dash=0, gap=0)
+        else:
+            pdf.line(x1, y, x2, y)
+
+    def draw_underlined_cell(width, h, text, ln=0, align='L'):
+        x = pdf.get_x()
+        y = pdf.get_y()
+        pdf.cell(width, h, text, border=0, ln=ln, align=align)
+        x2 = (pdf.w - pdf.r_margin) if width == 0 else (x + width)
+        draw_dotted_underline(x, x2, y + h + underline_offset)
+
+    def ensure_space(required_height=24):
+        if pdf.get_y() + required_height > pdf.page_break_trigger:
+            pdf.add_page()
+
+    def estimate_text_lines(content, max_width):
+        content = str(content or '')
+        if not content:
+            return 1
+        total_lines = 0
+        for paragraph in content.split('\n'):
+            if paragraph == '':
+                total_lines += 1
+                continue
+            current_line = ''
+            for ch in paragraph:
+                candidate = f"{current_line}{ch}"
+                if current_line and pdf.get_string_width(candidate) > max_width:
+                    total_lines += 1
+                    current_line = ch
+                else:
+                    current_line = candidate
+            if current_line:
+                total_lines += 1
+        return max(1, total_lines)
+
+    def estimate_list_item_height(text, indent=5, gap_after=2):
+        start_x = pdf.l_margin + indent
+        number_width = 10
+        box_size = 4
+        text_x = start_x + number_width + box_size + 2
+        usable_width = pdf.w - pdf.r_margin - text_x
+        estimated_lines = estimate_text_lines(text, usable_width)
+        return max(line_h * 1.2, estimated_lines * line_h) + gap_after + 2
 
     def draw_checkbox(text, checked, indent=0):
         usable_width = pdf.w - pdf.l_margin - pdf.r_margin
@@ -607,43 +701,63 @@ def download_pdf(submission_id):
     # --- 1. ประวัติผู้ขอรับการสนับสนุน ---
     draw_section_title("ประวัติผู้ขอรับการสนับสนุน")    
     # คำนวณความกว้างที่ใช้งานได้ของหน้ากระดาษ
-    usable_width = pdf.w - pdf.l_margin - pdf.r_margin    
+    usable_width = pdf.w - pdf.l_margin - pdf.r_margin
     # --- บรรทัดที่ 1: ชื่อ-สกุล และ ตำแหน่งทางวิชาการ (2 คอลัมน์) ---
-    col_width_2 = usable_width / 2
-    label_width_2 = 40 # ความกว้างของป้ายกำกับ
+    col_gap_2 = 6
+    col_width_2 = (usable_width - col_gap_2) / 2
+    row1_y = pdf.get_y()
+    label_width_name = 24
+    label_width_position = 40
+
     # คอลัมน์ที่ 1: ชื่อ-สกุล
+    pdf.set_xy(pdf.l_margin, row1_y)
     pdf.set_font('Sarabun', 'B', 11)
-    pdf.cell(label_width_2, line_h, "ชื่อ-สกุล:", 0, 0)
+    pdf.cell(label_width_name, line_h, "ชื่อ-สกุล:", 0, 0)
     pdf.set_font('Sarabun', '', 11)
-    pdf.cell(col_width_2 - label_width_2, line_h, f"{s.full_name or ''}", border='', ln=0, align='C')    
+    pdf.cell(col_width_2 - label_width_name, line_h, f"{s.full_name or ''}", border='', ln=0, align='L')
+
     # คอลัมน์ที่ 2: ตำแหน่งทางวิชาการ
+    pdf.set_xy(pdf.l_margin + col_width_2 + col_gap_2, row1_y)
     pdf.set_font('Sarabun', 'B', 11)
-    pdf.cell(label_width_2, line_h, "ตำแหน่งทางวิชาการ:", 0, 0, '') # จัดป้ายชิดขวา
+    pdf.cell(label_width_position, line_h, "ตำแหน่งทางวิชาการ:", 0, 0, '')
     pdf.set_font('Sarabun', '', 11)
-    pdf.cell(col_width_2 - label_width_2, line_h, f"{s.academic_position or ''}", border='', ln=1, align='C')
+    pdf.cell(col_width_2 - label_width_position, line_h, f"{s.academic_position or ''}", border='', ln=1, align='L')
+
     # --- บรรทัดที่ 2: สังกัด (1 คอลัมน์เต็ม) ---
     pdf.set_font('Sarabun', 'B', 11)
-    pdf.cell(label_width_2, line_h, "สังกัด:", 0, 0)
+    pdf.cell(label_width_name, line_h, "สังกัด:", 0, 0)
     pdf.set_font('Sarabun', '', 11)
-    pdf.cell(0, line_h, f"{s.affiliation or ''}", border='B', ln=1, align='L')
+    draw_underlined_cell(0, line_h, f"{s.affiliation or ''}", ln=1, align='L')
+    pdf.ln(1)
+
     # --- บรรทัดที่ 3: ข้อมูลติดต่อ (3 คอลัมน์) ---
-    col_width_3 = usable_width / 3
-    label_width_3 = 25
+    col_gap_3 = 4
+    col_width_3 = (usable_width - (2 * col_gap_3)) / 3
+    row3_y = pdf.get_y()
+    col1_x = pdf.l_margin
+    col2_x = col1_x + col_width_3 + col_gap_3
+    col3_x = col2_x + col_width_3 + col_gap_3
+
     # คอลัมน์ที่ 1: โทรศัพท์
+    pdf.set_xy(col1_x, row3_y)
     pdf.set_font('Sarabun', 'B', 11)
-    pdf.cell(label_width_3, line_h, "โทรศัพท์:", 0, 0)
+    pdf.cell(18, line_h, "โทรศัพท์:", 0, 0)
     pdf.set_font('Sarabun', '', 11)
-    pdf.cell(col_width_3 - label_width_3, line_h, f"{s.phone or ''}", border='B', ln=0, align='C')    
+    draw_underlined_cell(col_width_3 - 18, line_h, f"{s.phone or ''}", ln=0, align='L')
+
     # คอลัมน์ที่ 2: โทรศัพท์มือถือ
+    pdf.set_xy(col2_x, row3_y)
     pdf.set_font('Sarabun', 'B', 11)
-    pdf.cell(label_width_3, line_h, "โทรศัพท์มือถือ:", 0, 0, 'R')
+    pdf.cell(28, line_h, "โทรศัพท์มือถือ:", 0, 0)
     pdf.set_font('Sarabun', '', 11)
-    pdf.cell(col_width_3 - label_width_3, line_h, f"{s.mobile_phone or ''}", border='B', ln=0, align='C')    
+    draw_underlined_cell(col_width_3 - 28, line_h, f"{s.mobile_phone or ''}", ln=0, align='L')
+
     # คอลัมน์ที่ 3: อีเมล์
+    pdf.set_xy(col3_x, row3_y)
     pdf.set_font('Sarabun', 'B', 11)
-    pdf.cell(label_width_3 - 10, line_h, "อีเมล์:", 0, 0, 'R')
+    pdf.cell(14, line_h, "อีเมล์:", 0, 0)
     pdf.set_font('Sarabun', '', 11)
-    pdf.cell(col_width_3 - (label_width_3 - 10), line_h, f"{s.email or ''}", border='B', ln=1, align='C')
+    draw_underlined_cell(col_width_3 - 14, line_h, f"{s.email or ''}", ln=1, align='L')
     pdf.ln(5) # เว้นบรรทัดก่อนเริ่มส่วนถัดไป
 
     # --- 2. รายละเอียดผลงาน (กรุณาขีดเครื่องหมาย ✓ หน้าข้อความที่ตรงกับคุณสมบัติ) ---
@@ -661,16 +775,15 @@ def download_pdf(submission_id):
     pdf.set_font('Sarabun', 'B', 11)
     pdf.cell(label_width, line_h, "แหล่งงบประมาณที่ใช้ในการวิจัย:", 0, 0)
     pdf.set_font('Sarabun', '', 11)
-    # --- จุดที่แก้ไข: เปลี่ยน or '' เป็น or ' ' ---
-    pdf.cell(col_width_2 - label_width, line_h, f"{s.funding_source or ' '}", border='B', ln=0, align='C')
+    draw_underlined_cell(col_width_2 - label_width, line_h, f"{s.funding_source or ' '}" , ln=0, align='C')
 
     # คอลัมน์ที่ 2: ปีงบประมาณ
     pdf.set_xy(pdf.l_margin + col_width_2, start_y)
     pdf.set_font('Sarabun', 'B', 11)
     pdf.cell(label_width - 20, line_h, "ประจำปีงบประมาณ:", 0, 0, 'R')
     pdf.set_font('Sarabun', '', 11)
-    # --- จุดที่แก้ไข: เปลี่ยน or '' เป็น or ' ' ---
-    pdf.cell(col_width_2 - (label_width - 20), line_h, f"{s.fiscal_year or ' '}", border='B', ln=1, align='C')
+    draw_underlined_cell(col_width_2 - (label_width - 20), line_h, f"{s.fiscal_year or ' '}" , ln=1, align='C')
+    pdf.ln(2)
     # --- ส่วนที่ 3  ---    
     # 1. คุณสมบัติของผู้ขอรับการสนับสนุนฯ (เรียกใช้ draw_checkbox พร้อมค่าย่อหน้า)
     pdf.set_font('Sarabun', 'B', 11)
@@ -683,29 +796,8 @@ def download_pdf(submission_id):
         ("1.3", "กรณีเผยแพร่งานสร้างสรรค์ ต้องมีชื่อผู้สร้างสรรค์เป็นผู้จัดทำ พร้อมทั้งระบุชื่อมหาวิทยาลัย เทคโนโลยีราชมงคลธัญบุรีไว้ที่ตำแหน่งที่อยู่ของผลงานสร้างสรรค์ด้วย", s.qual_1_3)
     ]    
     for number, text, is_checked in qualifications:
-        start_y = pdf.get_y()        
-        # 1. วาดลำดับข้อ
-        pdf.set_font('Sarabun', '', 10)
-        pdf.set_x(pdf.l_margin + 5) # ย่อหน้าเข้ามา 5mm
-        pdf.cell(10, line_h, number, 0, 0)        
-        # 2. วาด Checkbox
-        box_x = pdf.get_x()
-        box_size = 4
-        # จัดตำแหน่งกล่องให้อยู่กึ่งกลางความสูงของบรรทัด
-        pdf.rect(box_x, start_y + (line_h - box_size) / 2, box_size, box_size)
-        if is_checked:
-            pdf.set_font('ZapfDingbats', '', 12)
-            pdf.text(box_x + 0.7, start_y + (line_h / 2) + (box_size / 4), '4')
-            pdf.set_font('Sarabun', '', 10)
-        # 3. วาดข้อความ
-        text_x = box_x + box_size + 2
-        pdf.set_xy(text_x, start_y)        
-        # คำนวณความกว้างที่เหลือสำหรับข้อความ
-        usable_width = pdf.w - pdf.r_margin - text_x
-        pdf.multi_cell(usable_width, line_h, text, align='L')        
-        # เว้นบรรทัดให้พอดีกับความสูงของข้อความที่วาดไป
-        pdf.ln(3)
-    pdf.ln(10)
+        draw_list_item(number, text, is_checked, indent=5)
+    pdf.ln(4)
 
     # 2. ขอบเขตของบทความวิจัยหรืองานสร้างสรรค์ที่ขอรับการสนับสนุน
     pdf.set_font('Sarabun', 'B', 11)
@@ -718,36 +810,14 @@ def download_pdf(submission_id):
         ("2.3", "บทความวิจัยที่ขอรับการสนับสนุนจะต้องมีผู้เขียนที่ระบุชื่อหน่วยงานของมหาวิทยาลัยเทคโนโลยีราชมงคลธัญบุรีที่ตำแหน่งที่อยู่ของผู้เขียนในบทความวิจัยไม่น้อยกว่าร้อยละ 50", s.scope_2_3)
     ]    
     for number, text, is_checked in scopes:
-        # บันทึกตำแหน่ง Y เริ่มต้นของแถว
-        start_y = pdf.get_y()        
-        # 1. วาดลำดับข้อ
-        pdf.set_font('Sarabun', '', 10)
-        pdf.set_x(pdf.l_margin + 5) # ย่อหน้าเข้ามา 5mm
-        pdf.cell(10, line_h, number, 0, 0)        
-        # 2. วาด Checkbox
-        box_x = pdf.get_x()
-        box_size = 4
-        # จัดตำแหน่งกล่องให้อยู่กึ่งกลางความสูงของบรรทัด
-        pdf.rect(box_x, start_y + (line_h - box_size) / 2, box_size, box_size)
-        if is_checked:
-            pdf.set_font('ZapfDingbats', '', 12)
-            pdf.text(box_x + 0.7, start_y + (line_h / 2) + (box_size / 4), '4')
-            pdf.set_font('Sarabun', '', 10)
-        # 3. วาดข้อความ
-        text_x = box_x + box_size + 2
-        pdf.set_xy(text_x, start_y)        
-        # คำนวณความกว้างที่เหลือสำหรับข้อความ
-        usable_width = pdf.w - pdf.r_margin - text_x
-        pdf.multi_cell(usable_width, line_h, text, align='L')        
-        # เว้นบรรทัดให้พอดี
-        pdf.ln(3)
-    pdf.ln(10)
+        draw_list_item(number, text, is_checked, indent=5)
+    pdf.ln(4)
 
     # 3. หลักเกณฑ์การจ่ายเงิน (ระดับชาติ)
-    pdf.add_page() 
+    pdf.add_page()
     pdf.set_font('Sarabun', 'B', 11)
     pdf.cell(0, 6, "3. หลักเกณฑ์การจ่ายเงินฯ กรณีตีพิมพ์ในวารสารระดับชาติ", 0, 1)
-    pdf.ln(2)
+    pdf.ln(1)
     # --- สร้างลิสต์ข้อมูลสำหรับส่วนที่ 3 ---
     placeholder = ".........." # ตัวแปรสำหรับเก็บเส้นประ    
     # แก้ไข f-string ให้ใช้ placeholder แทน 'N/A'
@@ -761,43 +831,24 @@ def download_pdf(submission_id):
     ]    
     # --- วาดทุกรายการเหมือนส่วนที่ 2 ---
     for number, text, is_checked in payments_nat:
-        # บันทึกตำแหน่ง Y เริ่มต้นของแถว
-        start_y = pdf.get_y()        
-        # 1. วาดลำดับข้อ
-        pdf.set_font('Sarabun', '', 10)
-        pdf.set_x(pdf.l_margin + 5)
-        pdf.cell(10, line_h, number, 0, 0)        
-        # 2. วาด Checkbox
-        box_x = pdf.get_x()
-        box_size = 4
-        pdf.rect(box_x, start_y + (line_h - box_size) / 2, box_size, box_size)
-        if is_checked:
-            pdf.set_font('ZapfDingbats', '', 12)
-            pdf.text(box_x + 0.7, start_y + (line_h / 2) + (box_size / 4), '4')
-            pdf.set_font('Sarabun', '', 10)
-        # 3. วาดข้อความ
-        text_x = box_x + box_size + 2
-        pdf.set_xy(text_x, start_y)        
-        usable_width_for_text = pdf.w - pdf.r_margin - text_x
-        pdf.multi_cell(usable_width_for_text, line_h, text, align='L')        
-        pdf.ln(3)
+        draw_list_item(number, text, is_checked, indent=5, gap_after=1)
    
-     # 4. หลักเกณฑ์การจ่ายเงินฯ กรณีตีพิมพ์ในวารสารระดับนานาชาติ
+    # 4. หลักเกณฑ์การจ่ายเงินฯ กรณีตีพิมพ์ในวารสารระดับนานาชาติ
+    pdf.ln(1)
     pdf.set_font('Sarabun', 'B', 11)
     pdf.cell(0, 6, "4. หลักเกณฑ์การจ่ายเงินฯ กรณีตีพิมพ์ในวารสารระดับนานาชาติ", 0, 1)
-    pdf.ln(2)
+    pdf.ln(1)
     # กำหนดค่าย่อหน้าและเส้นประ
     item_indent = 5
     sub_item_indent = 15
     placeholder = ".........."
     # --- 4.1 ---
     text_4_1 = f"ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์ (Page charge)... สนับสนุนตามที่จ่ายจริง แต่ไม่เกิน 10,000 บาท ต่อเรื่อง (ระบุ: {format_amount(s.charge_int_amount) or placeholder} บาท)"
-    draw_list_item("4.1", text_4_1, s.charge_int_checkbox, indent=item_indent)
-    pdf.ln(2)
+    draw_list_item("4.1", text_4_1, s.charge_int_checkbox, indent=item_indent, gap_after=1)
     
     # --- 4.2 ---
     text_4_2_main = "ค่าสมนาคุณการตีพิมพ์บทความวิจัยในวารสารระดับนานาชาติให้ใช้ค่าควอไทล์ที่ปรากฎใน ฐานข้อมูลการ จัดอันดับวารสาร Scopus โดยพิจารณาจากปีล่าสุดที่ปรากฎอยู่ในฐานข้อมูล ณ วันที่บทความได้รับการ ตีพิมพ์ ดังนี้"
-    draw_list_item("4.2", text_4_2_main, s.remuneration_int_checkbox, indent=item_indent)
+    draw_list_item("4.2", text_4_2_main, s.remuneration_int_checkbox, indent=item_indent, gap_after=1)
     # --- รายการย่อยของ 4.2 (Radio Buttons) ---
     quartile_map = {
         'top10': 'Top 10% หรือ Tier 1 (สนับสนุน 60,000 บาท)',
@@ -809,15 +860,15 @@ def download_pdf(submission_id):
     }
     for value, text in quartile_map.items():
         is_selected = (s.international_quartile == value)
-        draw_list_item("", text, is_selected, symbol_type='radio', indent=sub_item_indent)    
+        draw_list_item("", text, is_selected, symbol_type='radio', indent=sub_item_indent, gap_after=1)    
     # --- รายการย่อยของ 4.2 (การหาร) ---
     # แก้ไข f-string ให้ใช้ placeholder
     text_4_2_share = f"กรณีทำงานร่วมกับสถาบันอื่น (นานาชาติ) จะจ่ายค่าสมนาคุณตามสัดส่วน (คำนวณ: ฐาน {format_amount(s.share_int_base_amount) or placeholder} / {format_amount(s.share_int_num_institutes) or placeholder} สถาบัน = {format_amount(s.share_int_final_amount) or placeholder} บาท)"
     # แสดงตัวเลือกการแบ่งสัดส่วนเสมอ
-    draw_list_item("", text_4_2_share, s.share_int_checkbox, indent=sub_item_indent)
-    pdf.ln(5)
+    draw_list_item("", text_4_2_share, s.share_int_checkbox, indent=sub_item_indent, gap_after=1)
+    pdf.ln(1)
     
-      # 5. กรณีตีพิมพ์ในวารสารประเภทบทความวิจัยที่ถูกคัดเลือกฯ (Special Issue)
+    # 5. กรณีตีพิมพ์ในวารสารประเภทบทความวิจัยที่ถูกคัดเลือกฯ (Special Issue)
     pdf.add_page()
     pdf.set_font('Sarabun', 'B', 11)
     pdf.cell(0, 6, "5. กรณีตีพิมพ์ในวารสารประเภทบทความวิจัยที่ถูกคัดเลือกฯ (Special Issue)", 0, 1)
@@ -837,6 +888,25 @@ def download_pdf(submission_id):
     pdf.ln(2)
     # --- 5.2 ---
     text_5_2_main = "กรณีวารสารระดับนานาชาติและปรากฏในฐานข้อมูลสากล สนับสนุน 1 ใน 4 ของข้อ 4.2"
+
+    required_5_2_height = estimate_list_item_height(text_5_2_main, indent=item_indent)
+    if s.special_int_checkbox:
+        special_quartile_labels = [
+            'Top 10% หรือ Tier 1 (15,000 บาท)',
+            'ควอไทล์ที่ 1 (Q1) (7,500 บาท)',
+            'ควอไทล์ที่ 2 (Q2) (5,000 บาท)',
+            'ควอไทล์ที่ 3 (Q3) (2,500 บาท)',
+            'ควอไทล์ที่ 4 (Q4) (2,000 บาท)',
+            'ไม่มีควอไทล์ (1,000 บาท)'
+        ]
+        for label_text in special_quartile_labels:
+            required_5_2_height += estimate_list_item_height(label_text, indent=sub_item_indent)
+        required_5_2_height += estimate_list_item_height(
+            f"กรณีทำงานร่วมกับสถาบันอื่น (นานาชาติ): ฐาน {format_amount(s.special_int_share_base_amount) or placeholder} / {format_amount(s.special_int_share_num_institutes) or placeholder} สถาบัน = {format_amount(s.special_int_share_final_amount) or placeholder} บาท",
+            indent=sub_item_indent
+        )
+    ensure_space(required_5_2_height + 2)
+
     draw_list_item("5.2", text_5_2_main, s.special_int_checkbox, indent=item_indent)    
     # --- รายการย่อยของ 5.2 ---
     # จะแสดงผลก็ต่อเมื่อข้อ 5.2 ถูกเลือก
@@ -855,7 +925,7 @@ def download_pdf(submission_id):
         # การหารสัดส่วน
         text_5_2_share = f"กรณีทำงานร่วมกับสถาบันอื่น (นานาชาติ): ฐาน {format_amount(s.special_int_share_base_amount) or placeholder} / {format_amount(s.special_int_share_num_institutes) or placeholder} สถาบัน = {format_amount(s.special_int_share_final_amount) or placeholder} บาท"
         draw_list_item("", text_5_2_share, s.special_int_share_checkbox, indent=sub_item_indent)
-    pdf.ln(5)
+    pdf.ln(2)
 
      # 6. ค่าสมนาคุณงานสร้างสรรค์ที่เผยแพร่
     pdf.set_font('Sarabun', 'B', 11)
@@ -881,7 +951,7 @@ def download_pdf(submission_id):
     # แก้ไข f-string ให้ใช้ placeholder แทน 'N/A'
     text_share = f"กรณีทำงานร่วมกับสถาบันอื่น จะจ่ายค่าสมนาคุณตามสัดส่วน (คำนวณ: ฐาน {format_amount(s.creative_share_base_amount) or placeholder} / {format_amount(s.creative_share_num_institutes) or placeholder} สถาบัน = {format_amount(s.creative_share_final_amount) or placeholder} บาท)"
     draw_list_item("", text_share, s.creative_share_checkbox, indent=sub_item_indent)    
-    pdf.ln(5)
+    pdf.ln(2)
 
     # 7. หลักฐานประกอบการเสนอขอรับการสนับสนุน
     pdf.add_page()
