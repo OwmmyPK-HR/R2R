@@ -11,7 +11,7 @@
         <h1 class="header-title"><i class="fas fa-cog"></i> การตั้งค่าระบบ</h1>
     </header>
 
-    <div class="container admin-container">
+    <div class="container admin-container admin-settings-container">
         <div class="admin-header">
             <h2><i class="fas fa-cog"></i> การตั้งค่าระบบ</h2>
             <div>
@@ -19,18 +19,11 @@
                 <a href="{{ url_for('logout') }}" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
             </div>
         </div>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="flash {{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        <form method="post">
-            <fieldset>
-                <legend>การตั้งค่าหัวข้อแบบฟอร์ม</legend>
+        
+        <fieldset>
+            <legend>ส่วนที่ 1: ตั้งค่าหัวข้อแบบฟอร์ม</legend>
+            <form method="post">
+                <input type="hidden" name="setting_type" value="header_note">
                 <div class="form-group">
                     <label for="header_note">หมายเหตุในหัวข้อแบบฟอร์ม:</label>
                     <textarea id="header_note" name="header_note" rows="3" required>{{ current_note }}</textarea>
@@ -39,10 +32,107 @@
                     </small>
                 </div>
                 <button type="submit" class="submit-btn">
-                    <i class="fas fa-save"></i> บันทึกการตั้งค่า
+                    <i class="fas fa-save"></i> บันทึกหัวข้อแบบฟอร์ม
                 </button>
-            </fieldset>
-        </form>
+            </form>
+        </fieldset>
+
+        <fieldset style="margin-top: 20px;">
+            <legend>ส่วนที่ 2: ตั้งค่าลิงก์ความคิดเห็นหลังส่งฟอร์ม</legend>
+            <form method="post">
+                <input type="hidden" name="setting_type" value="feedback_link">
+                <div class="form-group feedback-link-card">
+                    <div class="feedback-link-header">
+                        <h3><i class="fas fa-link"></i> ลิงก์แบบประเมินความคิดเห็น</h3>
+                        <span class="feedback-link-chip"><i class="fab fa-google"></i> Google Form</span>
+                    </div>
+
+                    <label for="feedback_link">URL สำหรับแสดงใน Popup หลังส่งฟอร์มสำเร็จ:</label>
+                    <input type="url" id="feedback_link" name="feedback_link" value="{{ current_feedback_link }}" placeholder="https://docs.google.com/forms/d/e/.../viewform">
+
+                    <div class="feedback-link-tips">
+                        <p><i class="fas fa-lightbulb"></i> แนะนำให้ใช้ลิงก์จาก Google Form แบบผู้ใช้งานทั่วไป (viewform)</p>
+                        <p><i class="fas fa-check-circle"></i> ตัวอย่าง: https://docs.google.com/forms/d/e/xxxxxxxx/viewform</p>
+                    </div>
+
+                    {% if current_feedback_link %}
+                    <a href="{{ current_feedback_link }}" target="_blank" rel="noopener noreferrer" class="action-btn feedback-preview-btn">
+                        <i class="fas fa-external-link-alt"></i> เปิดลิงก์ปัจจุบัน
+                    </a>
+                    {% endif %}
+
+                    <small class="feedback-link-note">
+                        หากไม่ต้องการแสดงลิงก์ใน popup ให้ลบ URL ออกและกดบันทึก
+                    </small>
+                </div>
+                <button type="submit" class="submit-btn">
+                    <i class="fas fa-save"></i> บันทึกลิงก์ความคิดเห็น
+                </button>
+            </form>
+        </fieldset>
+
+        <fieldset style="margin-top: 20px;">
+            <legend>ส่วนที่ 3: ตั้งค่าหมายเหตุในฟอร์ม</legend>
+            <form method="post" style="margin-bottom: 16px;">
+                <input type="hidden" name="setting_type" value="form_note_single">
+                <input type="hidden" name="note_key" value="scope_2_1">
+                <div class="form-group">
+                    <label for="form_note_scope_2_1">หมายเหตุข้อ 2.1:</label>
+                    <textarea id="form_note_scope_2_1" name="form_note_scope_2_1" rows="3" required>{{ current_form_notes.scope_2_1 }}</textarea>
+                </div>
+                <button type="submit" class="submit-btn submit-btn-small">
+                    <i class="fas fa-save"></i> บันทึกหมายเหตุข้อ 2.1
+                </button>
+            </form>
+
+            <form method="post" style="margin-bottom: 16px;">
+                <input type="hidden" name="setting_type" value="form_note_single">
+                <input type="hidden" name="note_key" value="payment_3_3">
+                <div class="form-group">
+                    <label for="form_note_payment_3_3">หมายเหตุข้อ 3.3:</label>
+                    <textarea id="form_note_payment_3_3" name="form_note_payment_3_3" rows="3" required>{{ current_form_notes.payment_3_3 }}</textarea>
+                </div>
+                <button type="submit" class="submit-btn submit-btn-small">
+                    <i class="fas fa-save"></i> บันทึกหมายเหตุข้อ 3.3
+                </button>
+            </form>
+
+            <form method="post" style="margin-bottom: 16px;">
+                <input type="hidden" name="setting_type" value="form_note_single">
+                <input type="hidden" name="note_key" value="int_overlimit_warning">
+                <div class="form-group">
+                    <label for="form_note_int_overlimit_warning">หมายเหตุคำเตือนข้อ 4:</label>
+                    <textarea id="form_note_int_overlimit_warning" name="form_note_int_overlimit_warning" rows="3" required>{{ current_form_notes.int_overlimit_warning }}</textarea>
+                </div>
+                <button type="submit" class="submit-btn submit-btn-small">
+                    <i class="fas fa-save"></i> บันทึกหมายเหตุข้อ 4
+                </button>
+            </form>
+
+            <form method="post" style="margin-bottom: 16px;">
+                <input type="hidden" name="setting_type" value="form_note_single">
+                <input type="hidden" name="note_key" value="special_int_share">
+                <div class="form-group">
+                    <label for="form_note_special_int_share">หมายเหตุข้อ 5.2:</label>
+                    <textarea id="form_note_special_int_share" name="form_note_special_int_share" rows="3" required>{{ current_form_notes.special_int_share }}</textarea>
+                </div>
+                <button type="submit" class="submit-btn submit-btn-small">
+                    <i class="fas fa-save"></i> บันทึกหมายเหตุข้อ 5.2
+                </button>
+            </form>
+
+            <form method="post">
+                <input type="hidden" name="setting_type" value="form_note_single">
+                <input type="hidden" name="note_key" value="creative_support_limit">
+                <div class="form-group">
+                    <label for="form_note_creative_support_limit">หมายเหตุข้อ 6:</label>
+                    <textarea id="form_note_creative_support_limit" name="form_note_creative_support_limit" rows="3" required>{{ current_form_notes.creative_support_limit }}</textarea>
+                </div>
+                <button type="submit" class="submit-btn submit-btn-small">
+                    <i class="fas fa-save"></i> บันทึกหมายเหตุข้อ 6
+                </button>
+            </form>
+        </fieldset>
     </div>
 </body>
 </html>

@@ -37,6 +37,16 @@ def allowed_file(filename):
 db = SQLAlchemy(app)
 ADMIN_PASSWORD = "Publication_IRD" # รหัสผ่านสำหรับ Admin
 
+DEFAULT_HEADER_NOTE = "(สำหรับบทความวิจัยที่ตีพิมพ์เผยแพร่หลังวันที่ 26 กันยายน พ.ศ. 2566)"
+DEFAULT_FEEDBACK_LINK = ""
+DEFAULT_FORM_NOTES = {
+    'scope_2_1': 'บทความใดที่ได้ลงตีพิมพ์ในการประชุมวิชาการ และถูกคัดเลือกมาลงในวารสาร (Journal) สามารถขอรับการสนับสนุนได้เพียงอย่างเดียว',
+    'payment_3_3': 'พิจารณาเฉพาะสถาบันของผู้เขียนชื่อแรก (First author) และเป็นผู้รับผิดชอบหลัก (Corresponding author)',
+    'int_overlimit_warning': 'กรณีที่ผู้ขอรับการสนับสนุนมีเงินที่ต้องออกเองทั้งหมด เกินกว่า 10,000 บาท จะไม่สามารถให้การสนับสนุนได้',
+    'special_int_share': 'พิจารณาเฉพาะสถาบันของผู้เขียนชื่อแรก (First author) และเป็นผู้รับผิดชอบหลัก (Corresponding author)',
+    'creative_support_limit': 'ทั้งนี้ให้เป็นไปตามหลักเกณฑ์การพิจารณาคัดเลือกผลงานคุณภาพงานสร้างสรรค์ และสนับสนุนไม่เกิน 4 ผลงานต่อปี ต่อคน'
+}
+
 # --- โมเดลฐานข้อมูล ---
 # สร้าง Model ที่มี field ทั้งหมดจากฟอร์ม
 # หมายเหตุ: ชื่อ field เป็นภาษาอังกฤษเพื่อความสะดวกในการเขียนโค้ด
@@ -75,8 +85,6 @@ class Submission(db.Model):
     # Part 4
     charge_int_checkbox = db.Column(db.Boolean, default=False)
     charge_int_amount = db.Column(db.String(50))
-    charge_int_q1q2_checkbox = db.Column(db.Boolean, default=False)
-    charge_int_q1q2_amount = db.Column(db.String(50))
     remuneration_int_checkbox = db.Column(db.Boolean, default=False)
     international_quartile = db.Column(db.String(50))
     share_int_checkbox = db.Column(db.Boolean, default=False)
@@ -265,7 +273,7 @@ class PDF(FPDF):
         
         # ดึงการตั้งค่าหมายเหตุจากฐานข้อมูล
         setting = Settings.query.filter_by(key='header_note').first()
-        header_note = setting.value if setting else "(สำหรับบทความวิจัยที่ตีพิมพ์เผยแพร่หลังวันที่ 26 กันยายน พ.ศ. 2566)"
+        header_note = setting.value if setting else DEFAULT_HEADER_NOTE
         
         self.cell(0, 8, header_note, 0, 1, 'C')        
         # เว้นบรรทัดลงมาให้พ้นส่วน header เพื่อเริ่มเนื้อหา
@@ -276,6 +284,19 @@ class PDF(FPDF):
 def index():
     if request.method == 'POST':
         try:
+            def normalize_capped_amount(raw_value, max_amount=9999999):
+                if raw_value is None:
+                    return None
+                cleaned = str(raw_value).replace(',', '').strip()
+                if cleaned == '':
+                    return ''
+                try:
+                    amount = float(cleaned)
+                except ValueError:
+                    return cleaned
+                amount = max(0, min(amount, max_amount))
+                return str(int(amount)) if amount.is_integer() else f"{amount:.2f}".rstrip('0').rstrip('.')
+
             # Create a new submission instance
             new_submission = Submission()
             
@@ -306,7 +327,7 @@ def index():
             
             # --- ส่วนที่ 3: การสนับสนุน (ระดับชาติ) ---
             new_submission.payment_3_1 = request.form.get('payment_3_1') == 'true'
-            new_submission.page_charge_amount = request.form.get('page_charge_amount')
+            new_submission.page_charge_amount = normalize_capped_amount(request.form.get('page_charge_amount'))
             new_submission.payment_3_2 = request.form.get('payment_3_2') == 'true'
             new_submission.payment_3_3 = request.form.get('payment_3_3') == 'true'
             new_submission.num_institutes_3_3 = request.form.get('num_institutes_3_3')
@@ -315,8 +336,6 @@ def index():
             # --- ส่วนที่ 4: การสนับสนุน (ระดับนานาชาติ) ---
             new_submission.charge_int_checkbox = request.form.get('charge_int_checkbox') == 'true'
             new_submission.charge_int_amount = request.form.get('charge_int_amount')
-            new_submission.charge_int_q1q2_checkbox = request.form.get('charge_int_q1q2_checkbox') == 'true'
-            new_submission.charge_int_q1q2_amount = request.form.get('charge_int_q1q2_amount')
             new_submission.remuneration_int_checkbox = request.form.get('remuneration_int_checkbox') == 'true'
             new_submission.international_quartile = request.form.get('international_quartile')
             new_submission.share_int_checkbox = request.form.get('share_int_checkbox') == 'true'
@@ -383,9 +402,13 @@ def index():
             db.session.add(new_submission)
             db.session.commit()
 
+            feedback_setting = Settings.query.filter_by(key='feedback_link').first()
+            feedback_link = feedback_setting.value.strip() if feedback_setting and feedback_setting.value else ''
+
             return jsonify({
                 'status': 'success',
-                'message': f'ส่งข้อมูลสำเร็จ! เลขที่อ้างอิง: ฝวน IRD_06/{new_submission.id:05d}'
+                'message': f'ส่งข้อมูลสำเร็จ! เลขที่อ้างอิง: ฝวน IRD_06/{new_submission.id:05d}',
+                'feedback_link': feedback_link
             })
 
         except Exception as e:
@@ -398,10 +421,18 @@ def index():
 
     # สำหรับ request แบบ GET ให้แสดงหน้าฟอร์มปกติ
     # ดึงการตั้งค่าหมายเหตุจากฐานข้อมูล
-    setting = Settings.query.filter_by(key='header_note').first()
-    header_note = setting.value if setting else "(สำหรับบทความวิจัยที่ตีพิมพ์เผยแพร่หลังวันที่ 26 กันยายน พ.ศ. 2566)"
+    header_note_setting = Settings.query.filter_by(key='header_note').first()
+    header_note = header_note_setting.value if header_note_setting else DEFAULT_HEADER_NOTE
+
+    feedback_setting = Settings.query.filter_by(key='feedback_link').first()
+    feedback_link = feedback_setting.value.strip() if feedback_setting and feedback_setting.value else DEFAULT_FEEDBACK_LINK
+
+    form_notes = {}
+    for note_key, default_note in DEFAULT_FORM_NOTES.items():
+        setting = Settings.query.filter_by(key=f'form_note_{note_key}').first()
+        form_notes[note_key] = setting.value if setting and setting.value is not None else default_note
     
-    return render_template('index.html', header_note=header_note)
+    return render_template('index.html', header_note=header_note, feedback_link=feedback_link, form_notes=form_notes)
 
 @app.route('/login', methods=['POST']) # รับเฉพาะ POST เพราะไม่มีหน้า GET แล้ว
 def login():
@@ -525,7 +556,7 @@ def download_pdf(submission_id):
             pdf.circle(center_x_of_symbol, symbol_y_pos, radius, 'D') # 'D' = Draw (วาดเส้น)            
             if is_checked:
                 # ถ้าถูกเลือก ให้วาดวงกลมทึบด้านใน
-                pdf.circle(center_x_of_symbol, symbol_y_pos, radius * 0.6, 'F') # 'F' = Fill ( заливка)
+                pdf.circle(center_x_of_symbol, symbol_y_pos, radius * 1, 'F')
         # 3. วาดข้อความ
         pdf.set_font('Sarabun', '', 10)
         text_x = symbol_x + box_size + 2
@@ -764,10 +795,6 @@ def download_pdf(submission_id):
     draw_list_item("4.1", text_4_1, s.charge_int_checkbox, indent=item_indent)
     pdf.ln(2)
     
-    # --- 4.1.1 ---
-    text_4_1_1 = f"ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์ (Page charge) ในวารสารวิชาการที่ปรากฏในฐานข้อมูลสากลที่อยู่ในกลุ่ม Q1 และ Q2 ให้สนับสนุนตามที่จ่ายจริงหลังหักค่าสมนาคุณการตีพิมพ์บทความวิจัยตามข้อ 4.2 แต่ไม่เกิน 10,000 บาท ต่อเรื่อง (ระบุ: {format_amount(s.charge_int_q1q2_amount) or placeholder} บาท)"
-    draw_list_item("4.1.1", text_4_1_1, s.charge_int_q1q2_checkbox, indent=item_indent)
-    pdf.ln(2)
     # --- 4.2 ---
     text_4_2_main = "ค่าสมนาคุณการตีพิมพ์บทความวิจัยในวารสารระดับนานาชาติให้ใช้ค่าควอไทล์ที่ปรากฎใน ฐานข้อมูลการ จัดอันดับวารสาร Scopus โดยพิจารณาจากปีล่าสุดที่ปรากฎอยู่ในฐานข้อมูล ณ วันที่บทความได้รับการ ตีพิมพ์ ดังนี้"
     draw_list_item("4.2", text_4_2_main, s.remuneration_int_checkbox, indent=item_indent)
@@ -1030,26 +1057,93 @@ def admin_settings():
         return redirect(url_for('index'))
     
     if request.method == 'POST':
-        header_note = request.form.get('header_note')
-        
-        # อัปเดตหรือสร้างการตั้งค่าใหม่
-        setting = Settings.query.filter_by(key='header_note').first()
-        if setting:
-            setting.value = header_note
-            setting.updated_at = datetime.utcnow()
+        setting_type = request.form.get('setting_type')
+
+        if setting_type == 'header_note':
+            header_note = (request.form.get('header_note') or '').strip()
+            if not header_note:
+                flash('กรุณากรอกหมายเหตุหัวข้อแบบฟอร์ม', 'error')
+                return redirect(url_for('admin_settings'))
+
+            header_setting = Settings.query.filter_by(key='header_note').first()
+            if header_setting:
+                header_setting.value = header_note
+                header_setting.updated_at = datetime.utcnow()
+            else:
+                db.session.add(Settings(key='header_note', value=header_note))
+
+            db.session.commit()
+            flash('บันทึกการตั้งค่า "หัวข้อแบบฟอร์ม" เรียบร้อยแล้ว', 'success')
+
+        elif setting_type == 'feedback_link':
+            feedback_link = (request.form.get('feedback_link') or '').strip()
+            feedback_setting = Settings.query.filter_by(key='feedback_link').first()
+
+            if feedback_setting:
+                feedback_setting.value = feedback_link
+                feedback_setting.updated_at = datetime.utcnow()
+            else:
+                db.session.add(Settings(key='feedback_link', value=feedback_link))
+
+            db.session.commit()
+            flash('บันทึกการตั้งค่า "ลิงก์ความคิดเห็น" เรียบร้อยแล้ว', 'success')
+        elif setting_type == 'form_notes':
+            for note_key, default_note in DEFAULT_FORM_NOTES.items():
+                form_field = f'form_note_{note_key}'
+                form_value = request.form.get(form_field)
+                note_value = form_value.strip() if form_value is not None else default_note
+                setting = Settings.query.filter_by(key=form_field).first()
+
+                if setting:
+                    setting.value = note_value
+                    setting.updated_at = datetime.utcnow()
+                else:
+                    db.session.add(Settings(key=form_field, value=note_value))
+
+            db.session.commit()
+            flash('บันทึกการตั้งค่า "หมายเหตุในฟอร์ม" เรียบร้อยแล้ว', 'success')
+        elif setting_type == 'form_note_single':
+            note_key = (request.form.get('note_key') or '').strip()
+            if note_key not in DEFAULT_FORM_NOTES:
+                flash('ไม่พบหมายเหตุที่ต้องการบันทึก', 'error')
+                return redirect(url_for('admin_settings'))
+
+            form_field = f'form_note_{note_key}'
+            form_value = request.form.get(form_field)
+            note_value = form_value.strip() if form_value is not None else DEFAULT_FORM_NOTES[note_key]
+
+            setting = Settings.query.filter_by(key=form_field).first()
+            if setting:
+                setting.value = note_value
+                setting.updated_at = datetime.utcnow()
+            else:
+                db.session.add(Settings(key=form_field, value=note_value))
+
+            db.session.commit()
+            flash('บันทึกหมายเหตุเรียบร้อยแล้ว', 'success')
         else:
-            setting = Settings(key='header_note', value=header_note)
-            db.session.add(setting)
-        
-        db.session.commit()
-        flash('อัปเดตการตั้งค่าเรียบร้อยแล้ว', 'success')
+            flash('ไม่พบประเภทการตั้งค่าที่ต้องการบันทึก', 'error')
+
         return redirect(url_for('admin_settings'))
     
     # ดึงการตั้งค่าปัจจุบัน
-    setting = Settings.query.filter_by(key='header_note').first()
-    current_note = setting.value if setting else "(สำหรับบทความวิจัยที่ตีพิมพ์เผยแพร่หลังวันที่ 26 กันยายน พ.ศ. 2566)"
+    header_setting = Settings.query.filter_by(key='header_note').first()
+    current_note = header_setting.value if header_setting else DEFAULT_HEADER_NOTE
+
+    feedback_setting = Settings.query.filter_by(key='feedback_link').first()
+    current_feedback_link = feedback_setting.value if feedback_setting else DEFAULT_FEEDBACK_LINK
+
+    current_form_notes = {}
+    for note_key, default_note in DEFAULT_FORM_NOTES.items():
+        setting = Settings.query.filter_by(key=f'form_note_{note_key}').first()
+        current_form_notes[note_key] = setting.value if setting and setting.value is not None else default_note
     
-    return render_template('admin_settings.html', current_note=current_note)
+    return render_template(
+        'admin_settings.html',
+        current_note=current_note,
+        current_feedback_link=current_feedback_link,
+        current_form_notes=current_form_notes
+    )
 
 @app.errorhandler(413)
 def too_large(e):
@@ -1087,13 +1181,19 @@ def initialize_app():
         
         # ตรวจสอบและสร้างการตั้งค่าเริ่มต้นหากจำเป็น
         try:
-            existing_setting = Settings.query.filter_by(key='header_note').first()
-            if not existing_setting:
-                default_setting = Settings(
-                    key='header_note', 
-                    value='(สำหรับบทความวิจัยที่ตีพิมพ์เผยแพร่หลังวันที่ 26 กันยายน พ.ศ. 2566)'
-                )
-                db.session.add(default_setting)
+            defaults = {
+                'header_note': DEFAULT_HEADER_NOTE,
+                'feedback_link': DEFAULT_FEEDBACK_LINK
+            }
+
+            created_count = 0
+            for setting_key, setting_value in defaults.items():
+                existing_setting = Settings.query.filter_by(key=setting_key).first()
+                if not existing_setting:
+                    db.session.add(Settings(key=setting_key, value=setting_value))
+                    created_count += 1
+
+            if created_count > 0:
                 db.session.commit()
                 print("Default settings created.")
             else:

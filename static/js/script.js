@@ -20,27 +20,152 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Calculation for Section 4.2 ---
     const intQuartileRadios = document.querySelectorAll('input[name="international_quartile"]');
+    const chargeIntCheckbox = document.getElementById('charge_int_checkbox');
+    const chargeIntAmountInput = document.getElementById('charge_int_amount');
     const shareIntBaseAmountInput = document.getElementById('share_int_base_amount');
     const shareIntNumInstitutesInput = document.getElementById('share_int_num_institutes');
     const shareIntFinalAmountOutput = document.getElementById('share_int_final_amount');
-    if (intQuartileRadios.length > 0 && shareIntBaseAmountInput && shareIntNumInstitutesInput && shareIntFinalAmountOutput) {
-        function calculateIntShare() {
-            const baseAmount = parseFloat(shareIntBaseAmountInput.value) || 0;
-            const numInstitutes = parseInt(shareIntNumInstitutesInput.value, 10) || 0;
-            if (baseAmount > 0 && numInstitutes > 0) {
-                shareIntFinalAmountOutput.value = (baseAmount / numInstitutes).toFixed(2);
-            } else {
-                shareIntFinalAmountOutput.value = '';
-            }
+    const int42SelectedAmountInput = document.getElementById('int_42_selected_amount');
+    const int42ActualUsedAmountInput = document.getElementById('int_42_actual_used_amount');
+    const int42ResultAmountOutput = document.getElementById('int_42_result_amount');
+    const int41SelectedAmountInput = document.getElementById('int_41_selected_amount');
+    const int41ActualUsedAmountInput = document.getElementById('int_41_actual_used_amount');
+    const int41ResultAmountOutput = document.getElementById('int_41_result_amount');
+    const int41DeductionLabel = document.getElementById('int_41_deduction_label');
+
+    function updateInt41DeductionLabel() {
+        if (!int41DeductionLabel) {
+            return;
         }
+
+        if (chargeIntCheckbox && chargeIntCheckbox.checked) {
+            const chargeIntAmount = parseFloat(chargeIntAmountInput?.value) || 0;
+            int41DeductionLabel.textContent = `หักจากข้อ 4.1  ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์: ${chargeIntAmount.toFixed(2)} บาท`;
+        } else {
+            int41DeductionLabel.textContent = '';
+        }
+    }
+
+    function calculateIntShare() {
+        if (!shareIntBaseAmountInput || !shareIntNumInstitutesInput || !shareIntFinalAmountOutput) {
+            return;
+        }
+        const baseAmount = parseFloat(shareIntBaseAmountInput.value) || 0;
+        const numInstitutes = parseInt(shareIntNumInstitutesInput.value, 10) || 0;
+        if (baseAmount > 0 && numInstitutes > 0) {
+            shareIntFinalAmountOutput.value = (baseAmount / numInstitutes).toFixed(2);
+        } else {
+            shareIntFinalAmountOutput.value = '';
+        }
+    }
+
+    function calculateInt42Result() {
+        if (!int42SelectedAmountInput || !int42ActualUsedAmountInput || !int42ResultAmountOutput) {
+            return;
+        }
+
+        const selectedAmount = parseFloat(int42SelectedAmountInput.value) || 0;
+        const actualUsedAmount = parseFloat(int42ActualUsedAmountInput.value) || 0;
+
+        if (selectedAmount > 0 && actualUsedAmount >= 0 && int42ActualUsedAmountInput.value !== '') {
+            const resultAmount = actualUsedAmount - selectedAmount;
+            int42ResultAmountOutput.value = resultAmount.toFixed(2);
+        } else {
+            int42ResultAmountOutput.value = '';
+        }
+
+        adjustInt42ResultWidth();
+        calculateInt41Result();
+    }
+
+    function adjustInt42ResultWidth() {
+        if (!int42ResultAmountOutput) {
+            return;
+        }
+
+        const textForSizing = int42ResultAmountOutput.value || int42ResultAmountOutput.placeholder || '';
+        const widthInCh = Math.max(textForSizing.length + 1, 6);
+        int42ResultAmountOutput.style.width = `${widthInCh}ch`;
+    }
+
+    function adjustInt41ResultWidth() {
+        if (!int41ResultAmountOutput) {
+            return;
+        }
+
+        const textForSizing = int41ResultAmountOutput.value || int41ResultAmountOutput.placeholder || '';
+        const widthInCh = Math.max(textForSizing.length + 1, 6);
+        int41ResultAmountOutput.style.width = `${widthInCh}ch`;
+    }
+
+    function calculateInt41Result() {
+        if (!int41SelectedAmountInput || !int41ActualUsedAmountInput || !int41ResultAmountOutput) {
+            return;
+        }
+
+        const selectedAmountValue = (chargeIntCheckbox && chargeIntCheckbox.checked && chargeIntAmountInput)
+            ? (chargeIntAmountInput.value || '')
+            : '';
+
+        int41SelectedAmountInput.value = selectedAmountValue;
+        int41ActualUsedAmountInput.value = int42ResultAmountOutput ? (int42ResultAmountOutput.value || '') : '';
+
+        const selectedAmount = parseFloat(int41SelectedAmountInput.value) || 0;
+        const actualUsedAmount = parseFloat(int41ActualUsedAmountInput.value) || 0;
+
+        if (int41ActualUsedAmountInput.value !== '') {
+            const resultAmount = actualUsedAmount - selectedAmount;
+            int41ResultAmountOutput.value = resultAmount.toFixed(2);
+        } else {
+            int41ResultAmountOutput.value = '';
+        }
+
+        updateInt41DeductionLabel();
+        adjustInt41ResultWidth();
+    }
+
+    function syncSection42BaseAmountFromSelectedRadio() {
+        if (intQuartileRadios.length === 0) {
+            return;
+        }
+        const selectedRadio = document.querySelector('input[name="international_quartile"]:checked');
+        const amount = selectedRadio ? (selectedRadio.dataset.amount || '') : '';
+
+        if (shareIntBaseAmountInput) {
+            shareIntBaseAmountInput.value = amount;
+        }
+        if (int42SelectedAmountInput) {
+            int42SelectedAmountInput.value = amount;
+        }
+    }
+
+    if (intQuartileRadios.length > 0) {
         intQuartileRadios.forEach(radio => radio.addEventListener('change', function() {
-            if (this.checked) {
-                shareIntBaseAmountInput.value = this.dataset.amount;
-                calculateIntShare();
-            }
+            syncSection42BaseAmountFromSelectedRadio();
+            calculateIntShare();
+            calculateInt42Result();
         }));
+    }
+
+    if (shareIntNumInstitutesInput) {
         shareIntNumInstitutesInput.addEventListener('input', calculateIntShare);
     }
+    if (chargeIntCheckbox) {
+        chargeIntCheckbox.addEventListener('change', calculateInt41Result);
+    }
+    if (chargeIntAmountInput) {
+        chargeIntAmountInput.addEventListener('input', calculateInt41Result);
+    }
+    if (int42ActualUsedAmountInput) {
+        int42ActualUsedAmountInput.addEventListener('input', calculateInt42Result);
+    }
+
+    syncSection42BaseAmountFromSelectedRadio();
+    calculateIntShare();
+    calculateInt42Result();
+    calculateInt41Result();
+    adjustInt42ResultWidth();
+    adjustInt41ResultWidth();
 
     // --- Calculation for Section 5.1 ---
     const specialNatNumInstitutesInput = document.getElementById('special_nat_share_num_institutes');
@@ -155,23 +280,23 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
         });
     }
     
-    // --- ตรวจสอบเพดานตัวเลข 5,000 บาทสำหรับ Page charge (3.1) ---
+    // --- ตรวจสอบเพดานตัวเลข 9,999,999 บาทสำหรับ Page charge (3.1) ---
     const pageChargeAmountInput = document.getElementById('page_charge_amount');
     if (pageChargeAmountInput) {
         pageChargeAmountInput.addEventListener('input', function() {
             const value = parseFloat(this.value);
-            if (value > 5000) {
-                alert('จำนวนเงินต้องไม่เกิน 5,000 บาท ตามเพดานที่กำหนด');
-                this.value = 5000; // ตั้งค่าเป็น 5000 อัตโนมัติ
+            if (value > 9999999) {
+                alert('จำนวนเงินต้องไม่เกิน 9,999,999 บาท ตามเพดานที่กำหนด');
+                this.value = 9999999; // ตั้งค่าเป็น 9,999,999 อัตโนมัติ
             }
         });
         
         // ตรวจสอบเมื่อผู้ใช้พิมพ์เสร็จแล้ว (blur)
         pageChargeAmountInput.addEventListener('blur', function() {
             const value = parseFloat(this.value);
-            if (value > 5000) {
-                alert('จำนวนเงินต้องไม่เกิน 5,000 บาท ตามเพดานที่กำหนด');
-                this.value = 5000;
+            if (value > 9999999) {
+                alert('จำนวนเงินต้องไม่เกิน 9,999,999 บาท ตามเพดานที่กำหนด');
+                this.value = 9999999;
             }
         });
     }
@@ -191,27 +316,6 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
         
         // ตรวจสอบเมื่อผู้ใช้พิมพ์เสร็จแล้ว (blur)
         chargeIntAmountInput.addEventListener('blur', function() {
-            const value = parseFloat(this.value);
-            if (value > 10000) {
-                alert('จำนวนเงินต้องไม่เกิน 10,000 บาท ตามเพดานที่กำหนด');
-                this.value = 10000;
-            }
-        });
-    }
-    
-    // --- ตรวจสอบเพดานตัวเลข 10,000 บาทสำหรับ International Page charge Q1 Q2 (4.1.1) ---
-    const chargeIntQ1Q2AmountInput = document.getElementById('charge_int_q1q2_amount');
-    if (chargeIntQ1Q2AmountInput) {
-        chargeIntQ1Q2AmountInput.addEventListener('input', function() {
-            const value = parseFloat(this.value);
-            if (value > 10000) {
-                alert('จำนวนเงินต้องไม่เกิน 10,000 บาท ตามเพดานที่กำหนด');
-                this.value = 10000; // ตั้งค่าเป็น 10000 อัตโนมัติ
-            }
-        });
-        
-        // ตรวจสอบเมื่อผู้ใช้พิมพ์เสร็จแล้ว (blur)
-        chargeIntQ1Q2AmountInput.addEventListener('blur', function() {
             const value = parseFloat(this.value);
             if (value > 10000) {
                 alert('จำนวนเงินต้องไม่เกิน 10,000 บาท ตามเพดานที่กำหนด');
@@ -242,7 +346,7 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
             },
             {
                 name: '4. หลักเกณฑ์การจ่ายเงิน และรางวัลสนับสนุนการตีพิมพ์บทความวิจัย กรณีตีพิมพ์ในวารสารระดับนานาชาติ',
-                selectors: ['#charge_int_checkbox', '#charge_int_q1q2_checkbox', '#remuneration_int_checkbox', '#share_int_checkbox']
+                selectors: ['#charge_int_checkbox', '#remuneration_int_checkbox', '#share_int_checkbox']
             },
             {
                 name: '5. กรณีตีพิมพ์ในวารสาร ประเภทบทความวิจัยที่ถูกคัดเลือกมาจากการประชุมวิชาการและนำมาตีพิมพ์ลงใน วารสาร (Journal) และเป็นฉบับพิเศษ (Special Issue)',
@@ -288,8 +392,35 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
         const submitButton = mainForm.querySelector('button[type="submit"]');
         const popupTitle = successPopup.querySelector('#popup-title');
         const popupMessage = successPopup.querySelector('#popup-message');
+        const popupFeedback = successPopup.querySelector('#popup-feedback');
+        const popupFeedbackLink = successPopup.querySelector('#popup-feedback-link');
         const popupClose = successPopup.querySelector('#popup-close');
         const popupContent = successPopup.querySelector('.popup-content');
+
+        function getFeedbackLink(responseData = {}) {
+            const responseLink = (responseData.feedback_link || '').trim();
+            if (responseLink) {
+                return responseLink;
+            }
+            return (mainForm.dataset.feedbackLink || '').trim();
+        }
+
+        function hideFeedbackLink() {
+            if (popupFeedback) {
+                popupFeedback.style.display = 'none';
+            }
+            if (popupFeedbackLink) {
+                popupFeedbackLink.href = '#';
+            }
+        }
+
+        function showFeedbackLink(link) {
+            if (!popupFeedback || !popupFeedbackLink || !link) {
+                return;
+            }
+            popupFeedbackLink.href = link;
+            popupFeedback.style.display = 'block';
+        }
 
         mainForm.addEventListener('submit', function(event) {
             event.preventDefault();
@@ -300,6 +431,7 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
                 popupContent.classList.add('error');
                 popupTitle.textContent = 'กรุณาตรวจสอบข้อมูล';
                 popupMessage.textContent = validationResult.message;
+                hideFeedbackLink();
                 successPopup.style.display = 'flex';
                 return;
             }
@@ -316,6 +448,8 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
                     popupContent.classList.remove('error');
                     popupTitle.textContent = 'สำเร็จ!';
                     popupMessage.textContent = data.message;
+                    hideFeedbackLink();
+                    showFeedbackLink(getFeedbackLink(data));
                     successPopup.style.display = 'flex';
                     mainForm.reset();
                     window.scrollTo(0, 0);
@@ -323,6 +457,7 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
                     popupContent.classList.add('error');
                     popupTitle.textContent = 'เกิดข้อผิดพลาด!';
                     popupMessage.textContent = data.message;
+                    hideFeedbackLink();
                     successPopup.style.display = 'flex';
                 }
             })
@@ -331,6 +466,7 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
                 popupContent.classList.add('error');
                 popupTitle.textContent = 'ผิดพลาดรุนแรง!';
                 popupMessage.textContent = 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้';
+                hideFeedbackLink();
                 successPopup.style.display = 'flex';
             })
             .finally(() => {

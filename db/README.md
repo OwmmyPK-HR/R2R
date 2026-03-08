@@ -63,8 +63,6 @@
 #### Part 4: ค่าตอบแทนวารสารระดับนานาชาติ
 - `charge_int_checkbox` - เลือกขอค่า Page Charge
 - `charge_int_amount` - จำนวนเงินค่า Page Charge
-- `charge_int_q1q2_checkbox` - เลือกขอค่า Page Charge Q1/Q2
-- `charge_int_q1q2_amount` - จำนวนเงินค่า Page Charge Q1/Q2
 - `remuneration_int_checkbox` - เลือกขอค่าตอบแทนนานาชาติ
 - `international_quartile` - Quartile (Q1/Q2/Q3/Q4)
 - `share_int_checkbox` - มีการแบ่งหรือไม่
@@ -210,16 +208,12 @@ python db\init_db.py --help
 ### ตัวอย่าง Migration Scripts ที่มีอยู่:
 
 1. **migrate_database.py** - เพิ่มฟิลด์ `scope_2_3`
-2. **migrate_add_q1q2_fields.py** - เพิ่มฟิลด์ Q1/Q2 สำหรับ Page Charge
 
 ### วิธีการรัน Migration:
 
 ```powershell
 # Migration: เพิ่มฟิลด์ scope_2_3
 python migrate_database.py
-
-# Migration: เพิ่มฟิลด์ Q1/Q2
-python migrate_add_q1q2_fields.py
 ```
 
 ### สร้าง Migration Script ใหม่:

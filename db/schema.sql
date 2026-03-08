@@ -39,8 +39,6 @@ CREATE TABLE IF NOT EXISTS submission (
     -- Part 4: ค่าตอบแทนวารสารระดับนานาชาติ
     charge_int_checkbox BOOLEAN DEFAULT 0,
     charge_int_amount VARCHAR(50),
-    charge_int_q1q2_checkbox BOOLEAN DEFAULT 0,
-    charge_int_q1q2_amount VARCHAR(50),
     remuneration_int_checkbox BOOLEAN DEFAULT 0,
     international_quartile VARCHAR(50),
     share_int_checkbox BOOLEAN DEFAULT 0,
