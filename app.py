@@ -1,8 +1,6 @@
 import os
-import traceback
 from io import BytesIO
 from datetime import datetime
-from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from urllib.parse import quote
 from dotenv import load_dotenv
@@ -58,11 +56,6 @@ _is_production = (
     os.environ.get('FLASK_ENV') == 'production'
     or os.environ.get('APP_ENV') == 'production'
 )
-_force_dev_mode = get_env_bool('FORCE_DEV_MODE', False)
-if _force_dev_mode:
-    # Safety switch for test periods: avoid enabling production-only behavior by mistake.
-    _is_production = False
-    print('INFO: FORCE_DEV_MODE is enabled. Running in development-safe mode.')
 if not _secret_key:
     if _is_production:
         raise RuntimeError(
@@ -77,9 +70,6 @@ app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', 'uploads')
 app.config['SESSION_COOKIE_SECURE'] = get_env_bool('SESSION_COOKIE_SECURE', _is_production)
 app.config['SESSION_COOKIE_HTTPONLY'] = get_env_bool('SESSION_COOKIE_HTTPONLY', True)
 app.config['SESSION_COOKIE_SAMESITE'] = get_env_str('SESSION_COOKIE_SAMESITE', 'Lax')
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(
-    minutes=get_env_int('SESSION_LIFETIME_MINUTES', 480)
-)
 app.config['PREFERRED_URL_SCHEME'] = get_env_str(
     'PREFERRED_URL_SCHEME',
     'https' if _is_production else 'http'
@@ -92,28 +82,11 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
 # Database configuration - ใช้ environment variable สำหรับ production
 database_url = os.environ.get('DATABASE_URL')
 if database_url:
-    # แปลง postgres:// → postgresql:// (Heroku legacy format)
-    resolved_db_url = database_url.replace('postgres://', 'postgresql://')
-    # ตรวจสอบว่า DATABASE_URL ใน production ไม่ชี้ไปที่ SQLite หรือ placeholder
-    if _is_production:
-        _db_lower = resolved_db_url.lower()
-        if _db_lower.startswith('sqlite') or 'CHANGE_ME' in resolved_db_url:
-            raise RuntimeError(
-                "DATABASE_URL ใน production ต้องเป็น PostgreSQL URL จริง\n"
-                "รูปแบบ: postgresql://USER:PASSWORD@HOST:5432/DBNAME\n"
-                "ตรวจสอบว่าตั้งค่า DATABASE_URL ถูกต้องบน hosting platform"
-            )
-    app.config['SQLALCHEMY_DATABASE_URI'] = resolved_db_url
+    # สำหรับ PostgreSQL บน Heroku หรือแพลตฟอร์มอื่น
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url.replace('postgres://', 'postgresql://')
 else:
-    if _is_production:
-        raise RuntimeError(
-            "DATABASE_URL environment variable is required in production.\n"
-            "รูปแบบ: postgresql://USER:PASSWORD@HOST:5432/DBNAME\n"
-            "ตั้งค่า DATABASE_URL บน hosting platform dashboard ก่อน deploy"
-        )
-    # สำหรับการทดสอบ local เท่านั้น
+    # สำหรับการทดสอบ local
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
-    print('WARNING: Using SQLite for local development. Set DATABASE_URL=postgresql://... for production.')
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = get_env_int('MAX_CONTENT_LENGTH', 16 * 1024 * 1024)
@@ -150,44 +123,20 @@ def normalize_uploaded_filename(filename, allowed_extensions=None):
 
 db = SQLAlchemy(app)
 csrf = CSRFProtect(app)
-
-# Rate Limiter storage: กำหนดผ่าน env var LIMITER_STORAGE_URI
-# - memory:// (default): ใช้ได้กับ single worker (WEB_CONCURRENCY=1) เท่านั้น
-# - redis://host:6379  : รองรับ multi-worker แต่ต้องติดตั้ง redis-py และมี Redis server
-_limiter_storage_uri = get_env_str('LIMITER_STORAGE_URI', 'memory://')
-_web_concurrency = int(os.environ.get('WEB_CONCURRENCY', '1') or '1')
-if _is_production and _limiter_storage_uri == 'memory://' and _web_concurrency > 1:
-    print(
-        f'WARNING: LIMITER_STORAGE_URI=memory:// กับ WEB_CONCURRENCY={_web_concurrency} workers '
-        'ทำให้ rate limiting ไม่ทำงานข้าม worker. '
-        'ตั้ง LIMITER_STORAGE_URI=redis://... หรือ WEB_CONCURRENCY=1'
-    )
+# NOTE: ใช้ memory:// สำหรับ single-worker development เท่านั้น
+# สำหรับ production multi-worker (Gunicorn 4+ workers): ตั้ง WEB_CONCURRENCY=1 หรือใช้ Redis storage
+# storage_uri="redis://localhost:6379" (ต้องติดตั้ง redis-py)
 limiter = Limiter(
     get_remote_address,
     app=app,
     default_limits=[],
-    storage_uri=_limiter_storage_uri
+    storage_uri="memory://"  # ⚠️ WARNING: ใช้ได้ multi-worker ต้องใช้ Redis instead
 )
 
 if get_env_bool('USE_PROXY_FIX', _is_production):
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'Publication_IRD')
-if _is_production:
-    raw_admin_password_env = os.environ.get('ADMIN_PASSWORD')
-    if not raw_admin_password_env:
-        raise RuntimeError(
-            'ADMIN_PASSWORD environment variable is required in production. '
-            'Set a strong password before deploy.'
-        )
-    if raw_admin_password_env.strip() == 'Publication_IRD':
-        raise RuntimeError(
-            'ADMIN_PASSWORD must not use the default value in production.'
-        )
-    if len(raw_admin_password_env.strip()) < 12:
-        raise RuntimeError(
-            'ADMIN_PASSWORD is too short for production (minimum 12 characters).'
-        )
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'Publication_IRD')  # ตั้งค่า ADMIN_PASSWORD ใน env var ก่อน deploy
 ADMIN_PASSWORD_SETTING_KEY = 'admin_password_hash'
 
 DEFAULT_HEADER_NOTE = "(สำหรับบทความวิจัยที่ตีพิมพ์เผยแพร่หลังวันที่ 26 กันยายน พ.ศ. 2566)"
@@ -467,9 +416,6 @@ class PDF(FPDF):
 def index():
     if request.method == 'POST':
         try:
-            # Re-check schema on submit to avoid stale DB structure causing generic save failures.
-            _run_auto_migration()
-
             def normalize_capped_amount(raw_value, max_amount=9999999):
                 if raw_value is None:
                     return None
@@ -607,16 +553,10 @@ def index():
 
         except Exception as e:
             db.session.rollback()
-            print(f"Error while saving submission: {e}")
-            traceback.print_exc()
-
-            error_message = 'เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง'
-            if not _is_production:
-                error_message = f'เกิดข้อผิดพลาดในการบันทึกข้อมูล: {e}'
-
+            print(f"Error: {e}")
             return jsonify({
                 'status': 'error',
-                'message': error_message
+                'message': 'เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง'
             }), 500
 
     # สำหรับ request แบบ GET ให้แสดงหน้าฟอร์มปกติ
@@ -650,10 +590,7 @@ def login():
                 db.session.rollback()
                 print(f"Admin password hash migration error: {e}")
 
-        # ลดความเสี่ยง session fixation: clear session เดิมก่อนสร้าง admin session ใหม่
-        session.clear()
         session['admin_logged_in'] = True
-        session.permanent = True
         # ส่ง URL ของหน้า admin กลับไปให้ JavaScript
         return jsonify({'status': 'success', 'redirect_url': url_for('admin')})
     else:
@@ -662,7 +599,7 @@ def login():
 
 @app.route('/logout')
 def logout():
-    session.clear()
+    session.pop('admin_logged_in', None)
     return redirect(url_for('index'))
 
 @app.route('/admin')
@@ -1481,53 +1418,11 @@ def too_large(e):
     return jsonify({'status': 'error', 'message': 'ไฟล์ใหญ่เกินไป (ขนาดสูงสุด 16 MB)'}), 413
 
 
-def _run_auto_migration():
-    """ตรวจสอบและเพิ่ม columns ใหม่ที่ขาดหายในตาราง submission โดยอัตโนมัติ
-    ทำงานเมื่อ app startup — ปลอดภัย: ถ้า column มีอยู่แล้วจะข้ามไป"""
-    from sqlalchemy import inspect as sa_inspect
-
-    inspector = sa_inspect(db.engine)
-    if 'submission' not in inspector.get_table_names():
-        return  # ตารางยังไม่มี — db.create_all() จะสร้างให้ครบในขั้นตอนถัดไป
-
-    existing_cols = {c['name'] for c in inspector.get_columns('submission')}
-    needed_cols = {c.name for c in Submission.__table__.columns}
-    missing = needed_cols - existing_cols
-
-    if not missing:
-        return
-
-    is_sqlite = db.engine.dialect.name == 'sqlite'
-    for col_name in sorted(missing):
-        col = Submission.__table__.columns[col_name]
-        col_type = col.type.compile(dialect=db.engine.dialect)
-        col_type_upper = str(col.type).upper()
-        if 'BOOL' in col_type_upper:
-            default_clause = ' DEFAULT 0' if is_sqlite else ' DEFAULT FALSE'
-        elif 'VARCHAR' in col_type_upper or 'TEXT' in col_type_upper:
-            default_clause = " DEFAULT ''"
-        else:
-            default_clause = ''
-        try:
-            db.session.execute(text(f'ALTER TABLE submission ADD COLUMN {col_name} {col_type}{default_clause}'))
-            db.session.commit()
-            print(f'Auto-migration: เพิ่ม column "{col_name}" ลงในตาราง submission สำเร็จ')
-        except Exception as exc:
-            db.session.rollback()
-            print(f'Auto-migration: ข้าม column "{col_name}" ({exc})')
-
-
 def initialize_app():
     with app.app_context():
         # สร้างตารางหากไม่มีอยู่จริง
         db.create_all()
-
-        # Auto-migration: เพิ่ม columns ใหม่ที่อาจขาดหายในฐานข้อมูลที่ deploy ไปแล้ว
-        try:
-            _run_auto_migration()
-        except Exception as e:
-            print(f'Auto-migration error (non-fatal): {e}')
-
+        
         # ตรวจสอบและสร้างการตั้งค่าเริ่มต้นหากจำเป็น
         try:
             defaults = {
@@ -1553,29 +1448,10 @@ def initialize_app():
             print(f"Settings initialization error: {e}")
     
     # สร้างโฟลเดอร์อัปโหลดหากไม่มีอยู่จริง
-    upload_folder = app.config['UPLOAD_FOLDER']
-    if not os.path.exists(upload_folder):
-        os.makedirs(upload_folder)
+    if not os.path.exists(app.config['UPLOAD_FOLDER']):
+        os.makedirs(app.config['UPLOAD_FOLDER'])
         print("Uploads folder created.")
-
-    # ตรวจสอบว่า uploads folder เขียนได้จริง
-    try:
-        _test_path = os.path.join(upload_folder, '.write_test')
-        with open(_test_path, 'w') as _f:
-            _f.write('ok')
-        os.remove(_test_path)
-    except OSError:
-        print(f"WARNING: Uploads folder '{upload_folder}' is not writable. File uploads will fail.")
-
-    # แจ้งเตือนเรื่อง ephemeral filesystem บน cloud platforms
-    if _is_production:
-        abs_upload = os.path.abspath(upload_folder)
-        print(
-            f"INFO: Files are stored at '{abs_upload}'. "
-            "On cloud platforms (Heroku/Railway/Render) this folder is ephemeral — "
-            "files will be lost on restart. Use a VPS with persistent disk or configure cloud storage."
-        )
-
+        
     # สร้างโฟลเดอร์แบบอักษรหากไม่มีอยู่จริง
     if not os.path.exists('static/fonts'):
         os.makedirs('static/fonts')
@@ -1586,7 +1462,7 @@ def initialize_app():
 # ===========================
 
 @app.route('/api/logs', methods=['GET'])
-@limiter.limit("60 per minute")
+@csrf.exempt
 def api_logs():
     """ดึงข้อมูล logs"""
     if not session.get('admin_logged_in'):
@@ -1608,7 +1484,7 @@ def api_logs():
     return jsonify([log.to_dict() for log in logs])
 
 @app.route('/api/logs/submission/<int:submission_id>', methods=['GET'])
-@limiter.limit("60 per minute")
+@csrf.exempt
 def api_logs_by_submission(submission_id):
     """ดึง logs ที่เกี่ยวข้องกับ submission"""
     if not session.get('admin_logged_in'):
@@ -1619,7 +1495,7 @@ def api_logs_by_submission(submission_id):
     return jsonify([log.to_dict() for log in logs])
 
 @app.route('/api/tokens', methods=['GET'])
-@limiter.limit("30 per minute")
+@csrf.exempt
 def api_tokens():
     """ดึงข้อมูล tokens ทั้งหมด"""
     if not session.get('admin_logged_in'):
@@ -1630,7 +1506,7 @@ def api_tokens():
     return jsonify([token.to_dict() for token in tokens])
 
 @app.route('/api/tokens/<int:token_id>', methods=['DELETE'])
-@limiter.limit("20 per minute")
+@csrf.exempt
 def api_revoke_token(token_id):
     """ยกเลิก token"""
     if not session.get('admin_logged_in'):
@@ -1643,7 +1519,7 @@ def api_revoke_token(token_id):
     return jsonify({'status': 'success', 'message': 'Token ยกเลิกสำเร็จ'})
 
 @app.route('/api/tokens/cleanup', methods=['POST'])
-@limiter.limit("5 per minute")
+@csrf.exempt
 def api_cleanup_tokens():
     """ลบ tokens ที่หมดอายุ"""
     if not session.get('admin_logged_in'):
@@ -1658,29 +1534,6 @@ def api_cleanup_tokens():
     db.session.commit()
     
     return jsonify({'status': 'success', 'deleted': expired_tokens})
-
-
-@app.after_request
-def apply_security_headers(response):
-    # เพิ่ม header ป้องกันการโจมตีพื้นฐานสำหรับทุก response
-    response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-Frame-Options'] = 'DENY'
-    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-    response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
-    response.headers['Content-Security-Policy'] = (
-        "default-src 'self'; "
-        "img-src 'self' data:; "
-        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
-        "script-src 'self' 'unsafe-inline'; "
-        "font-src 'self' data: https://cdnjs.cloudflare.com; "
-        "object-src 'none'; "
-        "base-uri 'self'; "
-        "frame-ancestors 'none'; "
-        "form-action 'self'"
-    )
-    if _is_production and request.is_secure:
-        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-    return response
 
 # --------- Lazy Initialization (Safe for Gunicorn) ---------
 # ไม่เรียก initialize_app() ใน else (module import)
