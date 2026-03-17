@@ -57,6 +57,11 @@ _is_production = (
     os.environ.get('FLASK_ENV') == 'production'
     or os.environ.get('APP_ENV') == 'production'
 )
+_force_dev_mode = get_env_bool('FORCE_DEV_MODE', False)
+if _force_dev_mode:
+    # Safety switch for test periods: avoid enabling production-only behavior by mistake.
+    _is_production = False
+    print('INFO: FORCE_DEV_MODE is enabled. Running in development-safe mode.')
 if not _secret_key:
     if _is_production:
         raise RuntimeError(
