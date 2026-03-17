@@ -49,7 +49,7 @@ def get_env_str(name, default):
 
 
 # --- การกำหนดค่า ---
-app = Flask(__name__)
+app = Flask(__name__, instance_relative_config=True)
 
 _secret_key = os.environ.get('SECRET_KEY')
 _is_production = (
@@ -75,18 +75,28 @@ app.config['PREFERRED_URL_SCHEME'] = get_env_str(
     'https' if _is_production else 'http'
 )
 
+os.makedirs(app.instance_path, exist_ok=True)
+
 # สร้างโฟลเดอร์ uploads หากไม่มี
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
-# Database configuration - ใช้ environment variable สำหรับ production
-database_url = os.environ.get('DATABASE_URL')
-if database_url:
+def build_sqlite_database_uri(filename='database.db'):
+    sqlite_path = os.path.join(app.instance_path, filename)
+    return f"sqlite:///{sqlite_path.replace(os.sep, '/')}"
+
+
+# Database configuration - ใช้ SQLite ก่อนเป็นค่าเริ่มต้น
+database_url = os.environ.get('DATABASE_URL', '').strip()
+use_sqlite_first = get_env_bool('USE_SQLITE_FIRST', True)
+
+if use_sqlite_first or not database_url:
+    app.config['SQLALCHEMY_DATABASE_URI'] = build_sqlite_database_uri(
+        get_env_str('SQLITE_DATABASE_FILENAME', 'database.db')
+    )
+else:
     # สำหรับ PostgreSQL บน Heroku หรือแพลตฟอร์มอื่น
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url.replace('postgres://', 'postgresql://')
-else:
-    # สำหรับการทดสอบ local
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = get_env_int('MAX_CONTENT_LENGTH', 16 * 1024 * 1024)
@@ -455,7 +465,7 @@ def index():
             # Scope (Section 2) - เพิ่มข้อ 2.3 ใหม่
             new_submission.scope_2_1 = request.form.get('scope_2_1') == 'true'
             new_submission.scope_2_2 = request.form.get('scope_2_2') == 'true'
-            new_submission.scope_2_3 = request.form.get('scope_2_3') == 'true'  # ← เพิ่มบรรทัดนี้
+            new_submission.scope_2_3 = request.form.get('scope_2_3') == 'true'  
             
             # --- ส่วนที่ 3: การสนับสนุน (ระดับชาติ) ---
             new_submission.payment_3_1 = request.form.get('payment_3_1') == 'true'
