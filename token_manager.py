@@ -69,7 +69,7 @@ class TokenManager:
             
             # สร้าง token object
             token = Token(
-                token=raw_token,
+                token=TokenManager.hash_token(raw_token),  # เก็บ hash แทน plaintext
                 user_identifier=user_identifier,
                 expires_at=expires_at,
                 ip_address=ip_address,
@@ -77,12 +77,12 @@ class TokenManager:
                 token_type=token_type
             )
             
-            with app.app_context():
-                db.session.add(token)
-                db.session.commit()
+            db.session.add(token)
+            db.session.commit()
             
             print(f"✅ สร้าง {token_type} token สำหรับ {user_identifier}")
-            
+            # คืน raw_token ให้ผู้สร้าง (ใช้ที่เดียวไม่ถูกเก็บ)
+            token._raw_token = raw_token
             return token
         
         except Exception as e:

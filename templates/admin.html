@@ -2,6 +2,7 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>การจัดการเอกสาร</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
@@ -150,7 +151,7 @@
                 <p>คุณต้องการลบข้อมูล <strong id="delete-ref"></strong> หรือไม่?</p>
                 <p style="color: #f44336; font-size: 0.9em;">
                     <i class="fas fa-warning"></i> 
-                    การลบจะทำให้เลขฝวนถัดไปเลื่อนขึ้นมาแทนที่ และไม่สามารถกู้คืนได้
+                    การลบข้อมูลนี้ไม่สามารถกู้คืนได้
                 </p>
                 <div style="margin-top: 20px; text-align: center;">
                     <button id="confirm-delete-btn" class="submit-btn" style="background-color: #f44336; margin-right: 10px;">
@@ -175,10 +176,15 @@
             
             // ตั้งค่า event listener สำหรับปุ่มยืนยัน
             document.getElementById('confirm-delete-btn').onclick = function() {
-                // สร้าง form สำหรับส่ง POST request
+                // สร้าง form สำหรับส่ง POST request พร้อม CSRF token
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.action = '/delete/' + submissionId;
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrf_token';
+                csrfInput.value = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                form.appendChild(csrfInput);
                 document.body.appendChild(form);
                 form.submit();
             };

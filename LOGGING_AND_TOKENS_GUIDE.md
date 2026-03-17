@@ -95,7 +95,10 @@ from token_manager import TokenManager
 ```python
 # สร้าง API token ที่มีอายุ 30 วัน
 token = TokenManager.create_token('admin', token_type='api', expires_in_days=30)
-print(f"Token Created: {token.token}")
+print(f"Token Hash (stored): {token.token}")
+
+# ค่า raw token ใช้แสดง/ส่งต่อให้ผู้ใช้ครั้งเดียว (ไม่ได้ถูกเก็บใน DB)
+print(f"Token Raw (one-time): {token._raw_token}")
 
 # สร้าง token ที่ไม่มีอายุ (indefinite)
 token = TokenManager.create_token('system', token_type='jwt', expires_in_days=None)
@@ -104,7 +107,9 @@ token = TokenManager.create_token('system', token_type='jwt', expires_in_days=No
 #### ตรวจสอบ Token
 ```python
 # ตรวจสอบว่า token ถูกต้อง
-token_obj = TokenManager.verify_token('your-token-here')
+# หมายเหตุ: verify_token ในโค้ดปัจจุบันใช้ค่าที่เก็บในคอลัมน์ token โดยตรง
+# (ปัจจุบันคือค่า hash)
+token_obj = TokenManager.verify_token('stored-token-hash')
 if token_obj:
     print(f"✅ Token ถูกต้อง สำหรับ {token_obj.user_identifier}")
 else:
@@ -144,6 +149,9 @@ print(f"Deleted {deleted} expired tokens")
 ---
 
 ## 🔌 API Endpoints
+
+> ทุก endpoint ด้านล่างต้องเป็น **admin session** (`admin_logged_in`) และมี **rate limit**
+> โดย endpoint ที่เปลี่ยนข้อมูล (`DELETE`, `POST`) ต้องส่ง **CSRF token** ด้วย
 
 ### Logs Endpoints
 
@@ -208,6 +216,14 @@ DELETE /api/tokens/1
 POST /api/tokens/cleanup
 ```
 
+### Rate Limits (ตามโค้ดปัจจุบัน)
+
+- `GET /api/logs` -> `60 per minute`
+- `GET /api/logs/submission/<id>` -> `60 per minute`
+- `GET /api/tokens` -> `30 per minute`
+- `DELETE /api/tokens/<id>` -> `20 per minute`
+- `POST /api/tokens/cleanup` -> `5 per minute`
+
 ---
 
 ## 🎯 ตัวอย่างการใช้งานจริง
@@ -271,8 +287,9 @@ admin_token = TokenManager.create_token(
     expires_in_days=365  # Token มีอายุ 1 ปี
 )
 
-print(f"Admin API Token: {admin_token.token}")
-print("บันทึก token นี้ไว้ในที่ปลอดภัย!")
+print(f"Admin API Token Hash: {admin_token.token}")
+print(f"Admin API Token Raw (one-time): {admin_token._raw_token}")
+print("บันทึก raw token นี้ไว้ในที่ปลอดภัย เพราะระบบไม่เก็บ plaintext")
 ```
 
 ---
@@ -327,6 +344,7 @@ token = TokenManager.create_token(
 3. **บันทึกการเข้าถึง** - ล็อคลิสต์ของใครเข้าถึง API
 4. **หมุนเวียน tokens** - เปลี่ยน tokens เก่าเป็นใหม่เป็นระยะๆ
 5. **ตรวจสอบ logs** - ระบบตรวจสอบ logs เป็นประจำเพื่อหาความผิดปกติ
+6. **ป้องกัน CSRF สำหรับ API ที่เปลี่ยนข้อมูล** - ต้องส่ง CSRF token กับ `DELETE/POST` เสมอ
 
 ---
 

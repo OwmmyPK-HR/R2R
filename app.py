@@ -1,16 +1,83 @@
 import os
+from io import BytesIO
 from datetime import datetime
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
-from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, flash, jsonify
+from urllib.parse import quote
+from dotenv import load_dotenv
+from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, flash, jsonify, make_response
 from flask_sqlalchemy import SQLAlchemy
+from flask_wtf.csrf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from sqlalchemy import text
+from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 from fpdf import FPDF
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, '.env'))
+
+
+def get_env_int(name, default):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+
+    try:
+        return int(value)
+    except ValueError:
+        print(f"WARNING: Invalid integer for {name}: {value!r}. Using default {default}.")
+        return default
+
+
+def get_env_bool(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+
+    return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def get_env_str(name, default):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+
+    value = value.strip()
+    return value or default
+
+
 # --- การกำหนดค่า ---
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a8f5f167f44f4964e6c998dee827110c')  # Use environment variable in production
-app.config['UPLOAD_FOLDER'] = 'uploads'
+
+_secret_key = os.environ.get('SECRET_KEY')
+_is_production = (
+    os.environ.get('FLASK_ENV') == 'production'
+    or os.environ.get('APP_ENV') == 'production'
+)
+if not _secret_key:
+    if _is_production:
+        raise RuntimeError(
+            "SECRET_KEY environment variable is required. "
+            "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+        )
+    _secret_key = 'dev-insecure-secret-key-change-me'
+    print('WARNING: Using fallback dev SECRET_KEY. Set SECRET_KEY before deploying to production.')
+app.config['SECRET_KEY'] = _secret_key
+app.config['WTF_CSRF_TIME_LIMIT'] = 3600  # 1 ชั่วโมง
+app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', 'uploads')
+app.config['SESSION_COOKIE_SECURE'] = get_env_bool('SESSION_COOKIE_SECURE', _is_production)
+app.config['SESSION_COOKIE_HTTPONLY'] = get_env_bool('SESSION_COOKIE_HTTPONLY', True)
+app.config['SESSION_COOKIE_SAMESITE'] = get_env_str('SESSION_COOKIE_SAMESITE', 'Lax')
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(
+    minutes=get_env_int('SESSION_LIFETIME_MINUTES', 480)
+)
+app.config['PREFERRED_URL_SCHEME'] = get_env_str(
+    'PREFERRED_URL_SCHEME',
+    'https' if _is_production else 'http'
+)
 
 # สร้างโฟลเดอร์ uploads หากไม่มี
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
@@ -19,30 +86,110 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
 # Database configuration - ใช้ environment variable สำหรับ production
 database_url = os.environ.get('DATABASE_URL')
 if database_url:
-    # สำหรับ PostgreSQL บน Heroku หรือแพลตฟอร์มอื่น
-    app.config['SQLALCHEMY_DATABASE_URI'] = database_url.replace('postgres://', 'postgresql://')
+    # แปลง postgres:// → postgresql:// (Heroku legacy format)
+    resolved_db_url = database_url.replace('postgres://', 'postgresql://')
+    # ตรวจสอบว่า DATABASE_URL ใน production ไม่ชี้ไปที่ SQLite หรือ placeholder
+    if _is_production:
+        _db_lower = resolved_db_url.lower()
+        if _db_lower.startswith('sqlite') or 'CHANGE_ME' in resolved_db_url:
+            raise RuntimeError(
+                "DATABASE_URL ใน production ต้องเป็น PostgreSQL URL จริง\n"
+                "รูปแบบ: postgresql://USER:PASSWORD@HOST:5432/DBNAME\n"
+                "ตรวจสอบว่าตั้งค่า DATABASE_URL ถูกต้องบน hosting platform"
+            )
+    app.config['SQLALCHEMY_DATABASE_URI'] = resolved_db_url
 else:
-    # สำหรับการทดสอบ local
+    if _is_production:
+        raise RuntimeError(
+            "DATABASE_URL environment variable is required in production.\n"
+            "รูปแบบ: postgresql://USER:PASSWORD@HOST:5432/DBNAME\n"
+            "ตั้งค่า DATABASE_URL บน hosting platform dashboard ก่อน deploy"
+        )
+    # สำหรับการทดสอบ local เท่านั้น
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+    print('WARNING: Using SQLite for local development. Set DATABASE_URL=postgresql://... for production.')
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max file size
+app.config['MAX_CONTENT_LENGTH'] = get_env_int('MAX_CONTENT_LENGTH', 16 * 1024 * 1024)
 
-# กำหนดประเภทไฟล์ที่อนุญาต
-ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'}
+# กำหนดประเภทไฟล์ที่อนุญาต (ค่าเริ่มต้น)
+DEFAULT_ALLOWED_EXTENSIONS = {'pdf'}
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+# ข้อยกเว้นรายช่องอัปโหลด: 7.8 อนุญาตรูปภาพได้ด้วย
+ALLOWED_EXTENSIONS_BY_FIELD = {
+    'evidence_proof_upload': {'pdf', 'jpg', 'jpeg', 'png'}
+}
+
+def allowed_file(filename, allowed_extensions=None):
+    if '.' not in filename:
+        return False
+    extension = filename.rsplit('.', 1)[1].lower()
+    effective_allowed_extensions = allowed_extensions or DEFAULT_ALLOWED_EXTENSIONS
+    return extension in effective_allowed_extensions
+
+def normalize_uploaded_filename(filename, allowed_extensions=None):
+    sanitized_filename = secure_filename(filename)
+    if not sanitized_filename:
+        return ''
+
+    effective_allowed_extensions = allowed_extensions or DEFAULT_ALLOWED_EXTENSIONS
+    if '.' in sanitized_filename:
+        return sanitized_filename
+
+    if len(effective_allowed_extensions) == 1:
+        default_extension = next(iter(effective_allowed_extensions))
+        return f"{sanitized_filename}.{default_extension}"
+
+    return sanitized_filename
 
 db = SQLAlchemy(app)
-ADMIN_PASSWORD = "Publication_IRD" # รหัสผ่านสำหรับ Admin
+csrf = CSRFProtect(app)
+
+# Rate Limiter storage: กำหนดผ่าน env var LIMITER_STORAGE_URI
+# - memory:// (default): ใช้ได้กับ single worker (WEB_CONCURRENCY=1) เท่านั้น
+# - redis://host:6379  : รองรับ multi-worker แต่ต้องติดตั้ง redis-py และมี Redis server
+_limiter_storage_uri = get_env_str('LIMITER_STORAGE_URI', 'memory://')
+_web_concurrency = int(os.environ.get('WEB_CONCURRENCY', '1') or '1')
+if _is_production and _limiter_storage_uri == 'memory://' and _web_concurrency > 1:
+    print(
+        f'WARNING: LIMITER_STORAGE_URI=memory:// กับ WEB_CONCURRENCY={_web_concurrency} workers '
+        'ทำให้ rate limiting ไม่ทำงานข้าม worker. '
+        'ตั้ง LIMITER_STORAGE_URI=redis://... หรือ WEB_CONCURRENCY=1'
+    )
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[],
+    storage_uri=_limiter_storage_uri
+)
+
+if get_env_bool('USE_PROXY_FIX', _is_production):
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'Publication_IRD')
+if _is_production:
+    raw_admin_password_env = os.environ.get('ADMIN_PASSWORD')
+    if not raw_admin_password_env:
+        raise RuntimeError(
+            'ADMIN_PASSWORD environment variable is required in production. '
+            'Set a strong password before deploy.'
+        )
+    if raw_admin_password_env.strip() == 'Publication_IRD':
+        raise RuntimeError(
+            'ADMIN_PASSWORD must not use the default value in production.'
+        )
+    if len(raw_admin_password_env.strip()) < 12:
+        raise RuntimeError(
+            'ADMIN_PASSWORD is too short for production (minimum 12 characters).'
+        )
+ADMIN_PASSWORD_SETTING_KEY = 'admin_password_hash'
 
 DEFAULT_HEADER_NOTE = "(สำหรับบทความวิจัยที่ตีพิมพ์เผยแพร่หลังวันที่ 26 กันยายน พ.ศ. 2566)"
 DEFAULT_FEEDBACK_LINK = ""
 DEFAULT_FORM_NOTES = {
     'scope_2_1': 'บทความใดที่ได้ลงตีพิมพ์ในการประชุมวิชาการ และถูกคัดเลือกมาลงในวารสาร (Journal) สามารถขอรับการสนับสนุนได้เพียงอย่างเดียว',
     'payment_3_3': 'พิจารณาเฉพาะสถาบันของผู้เขียนชื่อแรก (First author) และเป็นผู้รับผิดชอบหลัก (Corresponding author)',
-    'int_overlimit_warning': 'กรณีที่ผู้ขอรับการสนับสนุนมีเงินที่ต้องออกเองทั้งหมด เกินกว่า 10,000 บาท จะไม่สามารถให้การสนับสนุนได้',
+    'int_overlimit_warning': 'กรณีที่ผู้ขอรับการสนับสนุนมีเงินที่ต้องออกเองทั้งหมด หากเกินกว่า 10,000 บาท จะไม่สามารถให้การสนับสนุนได้',
     'special_int_share': 'พิจารณาเฉพาะสถาบันของผู้เขียนชื่อแรก (First author) และเป็นผู้รับผิดชอบหลัก (Corresponding author)',
     'creative_support_limit': 'ทั้งนี้ให้เป็นไปตามหลักเกณฑ์การพิจารณาคัดเลือกผลงานคุณภาพงานสร้างสรรค์ และสนับสนุนไม่เกิน 4 ผลงานต่อปี ต่อคน'
 }
@@ -144,6 +291,32 @@ class Settings(db.Model):
     value = db.Column(db.Text, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+
+def verify_admin_password(password):
+    """ตรวจสอบรหัสผ่านแอดมิน โดยใช้ hash ใน settings และ fallback ค่าดั้งเดิม"""
+    if not password:
+        return False
+
+    password_setting = Settings.query.filter_by(key=ADMIN_PASSWORD_SETTING_KEY).first()
+    if password_setting and password_setting.value:
+        return check_password_hash(password_setting.value, password)
+
+    return password == ADMIN_PASSWORD
+
+
+def upsert_admin_password_hash(raw_password):
+    """บันทึกรหัสผ่านแอดมินแบบ hash ลง settings"""
+    password_hash = generate_password_hash(raw_password)
+    password_setting = Settings.query.filter_by(key=ADMIN_PASSWORD_SETTING_KEY).first()
+
+    if password_setting:
+        password_setting.value = password_hash
+        password_setting.updated_at = datetime.utcnow()
+    else:
+        db.session.add(Settings(key=ADMIN_PASSWORD_SETTING_KEY, value=password_hash))
+
+    db.session.commit()
+
 # --- Model สำหรับเก็บ Logs ---
 class Log(db.Model):
     __tablename__ = 'logs'
@@ -217,13 +390,20 @@ class PDF(FPDF):
         super().__init__(*args, **kwargs)
         self.submission_id = submission_id  # เก็บ submission_id สำหรับใช้ในการสร้างเลขที่เอกสาร
         try:
-            self.add_font('Sarabun', '', 'static/fonts/Sarabun-Regular.ttf', uni=True)
-            self.add_font('Sarabun', 'B', 'static/fonts/Sarabun-Bold.ttf', uni=True)
-            # vvv เพิ่มบรรทัดนี้เพื่อลงทะเบียนฟอนต์ตัวเอียง vvv
-            self.add_font('Sarabun', 'I', 'static/fonts/Sarabun-Italic.ttf', uni=True)
-        except RuntimeError:
-            print("Font files not found. Please download...")
+            # ใช้ absolute path แทน relative path เพื่อให้ทำงานถูกต้องจาก directory ใด ๆ
+            _font_base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'fonts')
+            self.add_font('Sarabun', '', os.path.join(_font_base_dir, 'Sarabun-Regular.ttf'), uni=True)
+            self.add_font('Sarabun', 'B', os.path.join(_font_base_dir, 'Sarabun-Bold.ttf'), uni=True)
+            self.add_font('Sarabun', 'I', os.path.join(_font_base_dir, 'Sarabun-Italic.ttf'), uni=True)
+        except RuntimeError as e:
+            print(f"Font files not found at {_font_base_dir}: {e}")
             pass
+        # โหลด header_note จาก database หนึ่งครั้งเพื่อไม่ให้ query ทุกครั้งที่เพิ่มหน้า
+        try:
+            self.header_note_cached = Settings.query.filter_by(key='header_note').first()
+            self.header_note = self.header_note_cached.value if self.header_note_cached else DEFAULT_HEADER_NOTE
+        except:
+            self.header_note = DEFAULT_HEADER_NOTE
         self.set_font('Sarabun', '', 12)
         # เพิ่มการตั้งค่า encoding สำหรับภาษาไทย
         self.set_auto_page_break(auto=True, margin=15)
@@ -271,11 +451,8 @@ class PDF(FPDF):
         self.cell(0, 8, "กองทุนส่งเสริมงานวิจัย มหาวิทยาลัยเทคโนโลยีราชมงคลธัญบุรี", 0, 1, 'C')
         self.set_font('Sarabun', 'B', 12)
         
-        # ดึงการตั้งค่าหมายเหตุจากฐานข้อมูล
-        setting = Settings.query.filter_by(key='header_note').first()
-        header_note = setting.value if setting else DEFAULT_HEADER_NOTE
-        
-        self.cell(0, 8, header_note, 0, 1, 'C')        
+        # ใช้ header_note ที่เก็บไว้ใน __init__ แล้ว เพื่อไม่ต้อง query database ทุกครั้ง
+        self.cell(0, 8, self.header_note, 0, 1, 'C')        
         # เว้นบรรทัดลงมาให้พ้นส่วน header เพื่อเริ่มเนื้อหา
         self.ln(10)
 
@@ -391,8 +568,16 @@ def index():
             for field_name in file_fields:
                 if field_name in request.files:
                     file = request.files[field_name]
-                    if file and file.filename and allowed_file(file.filename):
-                        filename = secure_filename(file.filename)
+                    if file and file.filename:
+                        allowed_extensions = ALLOWED_EXTENSIONS_BY_FIELD.get(field_name, DEFAULT_ALLOWED_EXTENSIONS)
+                        if not allowed_file(file.filename, allowed_extensions):
+                            allowed_suffixes = ', '.join(f".{ext}" for ext in sorted(allowed_extensions))
+                            return jsonify({
+                                'status': 'error',
+                                'message': f'ช่อง {field_name} อัปโหลดได้เฉพาะไฟล์ {allowed_suffixes} เท่านั้น'
+                            }), 400
+
+                        filename = normalize_uploaded_filename(file.filename, allowed_extensions)
                         unique_filename = f"{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}"
                         file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
                         file.save(file_path)
@@ -435,10 +620,25 @@ def index():
     return render_template('index.html', header_note=header_note, feedback_link=feedback_link, form_notes=form_notes)
 
 @app.route('/login', methods=['POST']) # รับเฉพาะ POST เพราะไม่มีหน้า GET แล้ว
+@limiter.limit("10 per minute")
 def login():
-    password = request.form.get('password')
-    if password == ADMIN_PASSWORD:
+    password = (request.form.get('password') or '').strip()
+    is_valid_password = verify_admin_password(password)
+
+    if is_valid_password:
+        # Migration แบบอัตโนมัติ: หากยังไม่มี hash ให้สร้างจากรหัสเดิมครั้งแรกที่ล็อกอินสำเร็จ
+        password_setting = Settings.query.filter_by(key=ADMIN_PASSWORD_SETTING_KEY).first()
+        if not password_setting or not password_setting.value:
+            try:
+                upsert_admin_password_hash(password)
+            except Exception as e:
+                db.session.rollback()
+                print(f"Admin password hash migration error: {e}")
+
+        # ลดความเสี่ยง session fixation: clear session เดิมก่อนสร้าง admin session ใหม่
+        session.clear()
         session['admin_logged_in'] = True
+        session.permanent = True
         # ส่ง URL ของหน้า admin กลับไปให้ JavaScript
         return jsonify({'status': 'success', 'redirect_url': url_for('admin')})
     else:
@@ -447,7 +647,7 @@ def login():
 
 @app.route('/logout')
 def logout():
-    session.pop('admin_logged_in', None)
+    session.clear()
     return redirect(url_for('index'))
 
 @app.route('/admin')
@@ -488,7 +688,7 @@ def admin():
 def download_pdf(submission_id):
     if not session.get('admin_logged_in'):
         return redirect(url_for('index'))        
-    s = Submission.query.get_or_404(submission_id)
+    s = db.get_or_404(Submission, submission_id)
     # ส่ง submission_id ไปยัง PDF class
     pdf = PDF(submission_id=submission_id, orientation='P', unit='mm', format='A4')
     pdf.add_page()    
@@ -673,6 +873,17 @@ def download_pdf(submission_id):
         estimated_lines = estimate_text_lines(text, usable_width)
         return max(line_h * 1.2, estimated_lines * line_h) + gap_after + 2
 
+    def parse_decimal(value):
+        if value is None:
+            return None
+        value_str = str(value).replace(',', '').strip()
+        if value_str == '':
+            return None
+        try:
+            return Decimal(value_str)
+        except (InvalidOperation, ValueError):
+            return None
+
     def draw_checkbox(text, checked, indent=0):
         usable_width = pdf.w - pdf.l_margin - pdf.r_margin
         # ตำแหน่งเริ่มต้นในการวาด จะบวกค่าย่อหน้าและที่รับเข้ามา
@@ -784,6 +995,7 @@ def download_pdf(submission_id):
     pdf.set_font('Sarabun', '', 11)
     draw_underlined_cell(col_width_2 - (label_width - 20), line_h, f"{s.fiscal_year or ' '}" , ln=1, align='C')
     pdf.ln(2)
+    draw_full_width_field("ชื่อโครงการวิจัย:", s.project_name)
     # --- ส่วนที่ 3  ---    
     # 1. คุณสมบัติของผู้ขอรับการสนับสนุนฯ (เรียกใช้ draw_checkbox พร้อมค่าย่อหน้า)
     pdf.set_font('Sarabun', 'B', 11)
@@ -843,7 +1055,12 @@ def download_pdf(submission_id):
     sub_item_indent = 15
     placeholder = ".........."
     # --- 4.1 ---
-    text_4_1 = f"ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์ (Page charge)... สนับสนุนตามที่จ่ายจริง แต่ไม่เกิน 10,000 บาท ต่อเรื่อง (ระบุ: {format_amount(s.charge_int_amount) or placeholder} บาท)"
+    text_4_1 = (
+        "ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์ (Page charge) "
+        "ในวารสารวิชาการที่ปรากฏในฐานข้อมูลสากลที่อยู่ในกลุ่ม Top 10% หรือ Tier 1 "
+        "และกลุ่ม Q1/Q2 ให้สนับสนุนตามที่จ่ายจริงหลังหักค่าสมนาคุณตามข้อ 4.2 "
+        f"แต่ไม่เกิน 10,000 บาท ต่อเรื่อง (ระบุ: {format_amount(s.charge_int_amount) or placeholder} บาท)"
+    )
     draw_list_item("4.1", text_4_1, s.charge_int_checkbox, indent=item_indent, gap_after=1)
     
     # --- 4.2 ---
@@ -866,6 +1083,31 @@ def download_pdf(submission_id):
     text_4_2_share = f"กรณีทำงานร่วมกับสถาบันอื่น (นานาชาติ) จะจ่ายค่าสมนาคุณตามสัดส่วน (คำนวณ: ฐาน {format_amount(s.share_int_base_amount) or placeholder} / {format_amount(s.share_int_num_institutes) or placeholder} สถาบัน = {format_amount(s.share_int_final_amount) or placeholder} บาท)"
     # แสดงตัวเลือกการแบ่งสัดส่วนเสมอ
     draw_list_item("", text_4_2_share, s.share_int_checkbox, indent=sub_item_indent, gap_after=1)
+
+    quartile_amount_map = {
+        'top10': Decimal('60000'),
+        'q1': Decimal('30000'),
+        'q2': Decimal('20000'),
+        'q3': Decimal('10000'),
+        'q4': Decimal('8000'),
+        'none': Decimal('4000')
+    }
+    selected_amount = parse_decimal(s.charge_int_amount)
+    quartile_amount = quartile_amount_map.get((s.international_quartile or '').strip())
+    used_amount = parse_decimal(s.share_int_final_amount) if s.share_int_checkbox else quartile_amount
+    if not s.remuneration_int_checkbox:
+        used_amount = None
+    result_amount = None
+    if selected_amount is not None and used_amount is not None:
+        result_amount = selected_amount - used_amount
+
+    text_4_2_formula = (
+        "ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์ - ค่าสมนาคุณข้อ 4.2 "
+        f"= {format_amount(result_amount) or placeholder} บาท "
+        f"(คำนวณ: {format_amount(selected_amount) or placeholder} - "
+        f"{format_amount(used_amount) or placeholder})"
+    )
+    draw_list_item("", text_4_2_formula, bool(s.charge_int_checkbox and s.remuneration_int_checkbox), indent=sub_item_indent, gap_after=1)
     pdf.ln(1)
     
     # 5. กรณีตีพิมพ์ในวารสารประเภทบทความวิจัยที่ถูกคัดเลือกฯ (Special Issue)
@@ -881,16 +1123,15 @@ def download_pdf(submission_id):
     text_5_1_main = "กรณีวารสารระดับชาติและปรากฏในฐานข้อมูลTCI สนับสนุน 1,000 บาท"
     draw_list_item("5.1", text_5_1_main, s.special_nat_checkbox, indent=item_indent)
     # --- รายการย่อยของ 5.1 ---
-    text_5_1_share = f"กรณีผู้ขอรับการสนับสนุนเขียนบทความวิจัยโดยทำงานร่วมกับสถาบันอื่น...ตามสัดส่วน (คำนวณ: 1000 / {format_amount(s.special_nat_share_num_institutes) or placeholder} สถาบัน = {format_amount(s.special_nat_share_final_amount) or placeholder} บาท)"
-    # จะแสดงผลก็ต่อเมื่อข้อ 5.1 ถูกเลือก
-    if s.special_nat_checkbox:
-        draw_list_item("", text_5_1_share, s.special_nat_share_checkbox, indent=sub_item_indent)
+    text_5_1_share = f"กรณีผู้ขอรับการสนับสนุนเขียนบทความวิจัยโดยทำงานร่วมกับสถาบันอื่น จะจ่ายค่าสมนาคุณตามสัดส่วน (คำนวณ: 1,000 / {format_amount(s.special_nat_share_num_institutes) or placeholder} สถาบัน = {format_amount(s.special_nat_share_final_amount) or placeholder} บาท)"
+    draw_list_item("", text_5_1_share, s.special_nat_share_checkbox, indent=sub_item_indent)
     pdf.ln(2)
     # --- 5.2 ---
     text_5_2_main = "กรณีวารสารระดับนานาชาติและปรากฏในฐานข้อมูลสากล สนับสนุน 1 ใน 4 ของข้อ 4.2"
 
     required_5_2_height = estimate_list_item_height(text_5_2_main, indent=item_indent)
-    if s.special_int_checkbox:
+    show_special_int_details = bool(s.special_int_checkbox or (s.special_international_quartile or '').strip() or s.special_int_share_checkbox)
+    if show_special_int_details:
         special_quartile_labels = [
             'Top 10% หรือ Tier 1 (15,000 บาท)',
             'ควอไทล์ที่ 1 (Q1) (7,500 บาท)',
@@ -909,8 +1150,7 @@ def download_pdf(submission_id):
 
     draw_list_item("5.2", text_5_2_main, s.special_int_checkbox, indent=item_indent)    
     # --- รายการย่อยของ 5.2 ---
-    # จะแสดงผลก็ต่อเมื่อข้อ 5.2 ถูกเลือก
-    if s.special_int_checkbox:
+    if show_special_int_details:
         special_quartile_map = {
             'top10': 'Top 10% หรือ Tier 1 (15,000 บาท)',
             'q1': 'ควอไทล์ที่ 1 (Q1) (7,500 บาท)',
@@ -988,44 +1228,51 @@ def download_pdf(submission_id):
     pdf.ln(10) # เพิ่มระยะห่างก่อนส่วนลงนาม
 
     # --- สร้างและส่งไฟล์ PDF ---
-    # แก้ไขการตั้งชื่อไฟล์ให้ใช้ชื่อผลงาน และชื่อผู้ขอรับการสนับสนุน
-    work_name = s.work_name_th or s.work_name_en or "ผลงาน"
-    applicant_name = s.full_name or "ผู้ขอรับการสนับสนุน"
-    
-    # ทำความสะอาดชื่อไฟล์ (ลบอักขระที่ไม่เหมาะสม)
-    work_name_clean = "".join(c for c in work_name if c.isalnum() or c in (' ', '-', '_')).rstrip()
-    applicant_name_clean = "".join(c for c in applicant_name if c.isalnum() or c in (' ', '-', '_')).rstrip()
-    
-    pdf_filename = f"{work_name_clean}_{applicant_name_clean}.pdf"
-    
-    # กำหนดโฟลเดอร์ปลายทาง - ลองหาโฟลเดอร์ Downloads ของ Admin
-    try:
-        # สำหรับ Windows
-        downloads_dir = os.path.join(os.path.expanduser("~"), "Downloads")
-        if not os.path.exists(downloads_dir):
-            # ถ้าหา Downloads ไม่เจอ ให้ใช้ Desktop แทน
-            downloads_dir = os.path.join(os.path.expanduser("~"), "Desktop")
-        if not os.path.exists(downloads_dir):
-            # ถ้าหา Desktop ก็ไม่เจอ ให้ใช้ current directory
-            downloads_dir = os.getcwd()
-    except:
-        # ถ้าเกิดข้อผิดพลาดใดๆ ให้ใช้ current directory
-        downloads_dir = os.getcwd()
-    
-    # บันทึกไฟล์ PDF ลงในโฟลเดอร์ปลายทาง
-    pdf_path = os.path.join(downloads_dir, pdf_filename)
-    pdf.output(pdf_path)
-    
-    # ส่งไฟล์ให้ดาวน์โหลด
-    return send_from_directory(downloads_dir, pdf_filename, as_attachment=True)
+    work_name = (s.work_name_th or s.work_name_en or "ผลงาน").strip()
+    applicant_name = (s.full_name or "ผู้ขอรับการสนับสนุน").strip()
+
+    # Flask/Werkzeug ต้องการ header ที่ encode แบบ latin-1 ได้ จึงต้องมี ASCII fallback เสมอ
+    utf8_download_name = f"{work_name}_{applicant_name}.pdf"
+    ascii_download_name = secure_filename(f"{work_name}_{applicant_name}")
+    if not ascii_download_name:
+        ascii_download_name = f"submission_{s.id:05d}"
+    ascii_download_name = f"{ascii_download_name}.pdf"
+
+    # สร้าง PDF ในหน่วยความจำและส่งตรงให้ผู้ใช้ดาวน์โหลด ไม่บันทึกลงดิสก์ server
+    raw_pdf = pdf.output()
+    if isinstance(raw_pdf, str):
+        # pyfpdf บางเวอร์ชันคืนค่าเป็น latin-1 string
+        pdf_bytes = raw_pdf.encode('latin-1')
+    else:
+        # fpdf2 มักคืนเป็น bytearray
+        pdf_bytes = bytes(raw_pdf)
+    response = make_response(pdf_bytes)
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = (
+        f"attachment; filename=\"{ascii_download_name}\"; "
+        f"filename*=UTF-8''{quote(utf8_download_name)}"
+    )
+    return response
 
 # --- สำหรับเปิดดูไฟล์ที่อัปโหลด ---
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
     if not session.get('admin_logged_in'):
         return redirect(url_for('index'))
-    # ส่งไฟล์จากโฟลเดอร์ uploads กลับไป
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+    # ไฟล์เก่าบางรายการถูกบันทึกมาแบบไม่มีนามสกุล ให้ default เป็น .pdf
+    download_name = secure_filename(os.path.basename(filename))
+    if not download_name:
+        download_name = 'attachment.pdf'
+    elif '.' not in download_name:
+        download_name = f"{download_name}.pdf"
+
+    return send_from_directory(
+        app.config['UPLOAD_FOLDER'],
+        filename,
+        as_attachment=True,
+        download_name=download_name
+    )
 
 # --- สำหรับดึงข้อมูลไปแสดงใน Popup ---
 @app.route('/submission/<int:submission_id>')
@@ -1033,7 +1280,7 @@ def get_submission(submission_id):
     if not session.get('admin_logged_in'):
         return jsonify({'error': 'Unauthorized'}), 401    
     
-    submission = Submission.query.get_or_404(submission_id)
+    submission = db.get_or_404(Submission, submission_id)
     
     # แปลงข้อมูล object เป็น dictionary เพื่อส่งกลับเป็น JSON
     # โค้ดนี้จะดึงข้อมูลทุกคอลัมน์มาโดยอัตโนมัติ
@@ -1051,8 +1298,7 @@ def delete_submission(submission_id):
     if not session.get('admin_logged_in'):
         return redirect(url_for('index'))
 
-    submission = Submission.query.get_or_404(submission_id)
-    deleted_id = submission.id
+    submission = db.get_or_404(Submission, submission_id)
 
     # ลิสต์ของ field ทั้งหมดที่เก็บชื่อไฟล์อัปโหลด
     file_fields_to_delete = [
@@ -1077,44 +1323,12 @@ def delete_submission(submission_id):
             print(f"Warning: Field '{field}' does not exist in Submission model")
 
     # ลบข้อมูลออกจากฐานข้อมูล
-    db.session.delete(submission)
-    db.session.commit()
-
-    # หาข้อมูลทั้งหมดที่มี ID มากกว่า ID ที่ถูกลบ และจัดเรียงตาม ID
-    submissions_to_update = Submission.query.filter(Submission.id > deleted_id).order_by(Submission.id).all()
-    
-    # อัปเดต ID ของข้อมูลที่เหลือให้เรียงต่อกัน โดยใช้ raw SQL
-    for submission in submissions_to_update:
-        old_id = submission.id
-        new_id = old_id - 1
-        
-        try:
-            # ใช้ text() สำหรับ raw SQL ใน SQLAlchemy 2.x
-            db.session.execute(
-                text("UPDATE submission SET id = :new_id WHERE id = :old_id"),
-                {"new_id": new_id, "old_id": old_id}
-            )
-        except Exception as e:
-            print(f"Error updating ID from {old_id} to {new_id}: {e}")
-            db.session.rollback()
-            flash('เกิดข้อผิดพลาดในการจัดเรียง ID ใหม่', 'error')
-            return redirect(url_for('admin'))
-    
-    # Commit การเปลี่ยนแปลง
     try:
+        db.session.delete(submission)
         db.session.commit()
-        
-        # รีเซ็ต AUTO_INCREMENT เฉพาะ SQLite
-        if db.engine.dialect.name == 'sqlite':
-            max_id_result = db.session.execute(text("SELECT MAX(id) FROM submission")).fetchone()
-            max_id = max_id_result[0] if max_id_result[0] else 0
-            # รีเซ็ต sequence สำหรับ SQLite
-            db.session.execute(text(f"UPDATE sqlite_sequence SET seq = {max_id} WHERE name = 'submission'"))
-            db.session.commit()
-        
         flash('ลบข้อมูลเรียบร้อยแล้ว', 'success')
     except Exception as e:
-        print(f"Error during final commit or auto increment reset: {e}")
+        print(f"Error during delete: {e}")
         db.session.rollback()
         flash('เกิดข้อผิดพลาดในการลบข้อมูล', 'error')
 
@@ -1191,6 +1405,38 @@ def admin_settings():
 
             db.session.commit()
             flash('บันทึกหมายเหตุเรียบร้อยแล้ว', 'success')
+        elif setting_type == 'admin_password':
+            current_password = (request.form.get('current_password') or '').strip()
+            new_password = (request.form.get('new_password') or '').strip()
+            confirm_new_password = (request.form.get('confirm_new_password') or '').strip()
+
+            if not current_password or not new_password or not confirm_new_password:
+                flash('กรุณากรอกข้อมูลรหัสผ่านให้ครบทุกช่อง', 'error')
+                return redirect(url_for('admin_settings'))
+
+            if not verify_admin_password(current_password):
+                flash('รหัสผ่านปัจจุบันไม่ถูกต้อง', 'error')
+                return redirect(url_for('admin_settings'))
+
+            if len(new_password) < 8:
+                flash('รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 8 ตัวอักษร', 'error')
+                return redirect(url_for('admin_settings'))
+
+            if new_password != confirm_new_password:
+                flash('รหัสผ่านใหม่และการยืนยันรหัสผ่านไม่ตรงกัน', 'error')
+                return redirect(url_for('admin_settings'))
+
+            if verify_admin_password(new_password):
+                flash('รหัสผ่านใหม่ต้องไม่ซ้ำรหัสผ่านเดิม', 'error')
+                return redirect(url_for('admin_settings'))
+
+            try:
+                upsert_admin_password_hash(new_password)
+                flash('เปลี่ยนรหัสผ่านแอดมินเรียบร้อยแล้ว', 'success')
+            except Exception as e:
+                db.session.rollback()
+                print(f"Admin password update error: {e}")
+                flash('เกิดข้อผิดพลาดในการเปลี่ยนรหัสผ่าน กรุณาลองใหม่อีกครั้ง', 'error')
         else:
             flash('ไม่พบประเภทการตั้งค่าที่ต้องการบันทึก', 'error')
 
@@ -1219,41 +1465,60 @@ def admin_settings():
 def too_large(e):
     return jsonify({'status': 'error', 'message': 'ไฟล์ใหญ่เกินไป (ขนาดสูงสุด 16 MB)'}), 413
 
-@app.route('/test_upload')
-def test_upload():
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head><title>Test Upload</title></head>
-    <body>
-        <h1>Test File Upload</h1>
-        <form method="post" enctype="multipart/form-data" action="/">
-            <label>Name:</label><br>
-            <input type="text" name="fullName" value="Test User" required><br><br>
-            
-            <label>Affiliation:</label><br>
-            <input type="text" name="affiliation" value="Test University" required><br><br>
-            
-            <label>Page Charge Evidence:</label><br>
-            <input type="checkbox" name="evidence_page_charge_check" checked>
-            <input type="file" name="evidence_page_charge_upload" accept=".pdf"><br><br>
-            
-            <button type="submit">Submit</button>
-        </form>
-    </body>
-    </html>
-    """
+
+def _run_auto_migration():
+    """ตรวจสอบและเพิ่ม columns ใหม่ที่ขาดหายในตาราง submission โดยอัตโนมัติ
+    ทำงานเมื่อ app startup — ปลอดภัย: ถ้า column มีอยู่แล้วจะข้ามไป"""
+    from sqlalchemy import inspect as sa_inspect
+
+    inspector = sa_inspect(db.engine)
+    if 'submission' not in inspector.get_table_names():
+        return  # ตารางยังไม่มี — db.create_all() จะสร้างให้ครบในขั้นตอนถัดไป
+
+    existing_cols = {c['name'] for c in inspector.get_columns('submission')}
+    needed_cols = {c.name for c in Submission.__table__.columns}
+    missing = needed_cols - existing_cols
+
+    if not missing:
+        return
+
+    is_sqlite = db.engine.dialect.name == 'sqlite'
+    for col_name in sorted(missing):
+        col = Submission.__table__.columns[col_name]
+        col_type = col.type.compile(dialect=db.engine.dialect)
+        col_type_upper = str(col.type).upper()
+        if 'BOOL' in col_type_upper:
+            default_clause = ' DEFAULT 0' if is_sqlite else ' DEFAULT FALSE'
+        elif 'VARCHAR' in col_type_upper or 'TEXT' in col_type_upper:
+            default_clause = " DEFAULT ''"
+        else:
+            default_clause = ''
+        try:
+            db.session.execute(text(f'ALTER TABLE submission ADD COLUMN {col_name} {col_type}{default_clause}'))
+            db.session.commit()
+            print(f'Auto-migration: เพิ่ม column "{col_name}" ลงในตาราง submission สำเร็จ')
+        except Exception as exc:
+            db.session.rollback()
+            print(f'Auto-migration: ข้าม column "{col_name}" ({exc})')
+
 
 def initialize_app():
     with app.app_context():
         # สร้างตารางหากไม่มีอยู่จริง
         db.create_all()
-        
+
+        # Auto-migration: เพิ่ม columns ใหม่ที่อาจขาดหายในฐานข้อมูลที่ deploy ไปแล้ว
+        try:
+            _run_auto_migration()
+        except Exception as e:
+            print(f'Auto-migration error (non-fatal): {e}')
+
         # ตรวจสอบและสร้างการตั้งค่าเริ่มต้นหากจำเป็น
         try:
             defaults = {
                 'header_note': DEFAULT_HEADER_NOTE,
-                'feedback_link': DEFAULT_FEEDBACK_LINK
+                'feedback_link': DEFAULT_FEEDBACK_LINK,
+                ADMIN_PASSWORD_SETTING_KEY: generate_password_hash(ADMIN_PASSWORD)
             }
 
             created_count = 0
@@ -1273,10 +1538,29 @@ def initialize_app():
             print(f"Settings initialization error: {e}")
     
     # สร้างโฟลเดอร์อัปโหลดหากไม่มีอยู่จริง
-    if not os.path.exists(app.config['UPLOAD_FOLDER']):
-        os.makedirs(app.config['UPLOAD_FOLDER'])
+    upload_folder = app.config['UPLOAD_FOLDER']
+    if not os.path.exists(upload_folder):
+        os.makedirs(upload_folder)
         print("Uploads folder created.")
-        
+
+    # ตรวจสอบว่า uploads folder เขียนได้จริง
+    try:
+        _test_path = os.path.join(upload_folder, '.write_test')
+        with open(_test_path, 'w') as _f:
+            _f.write('ok')
+        os.remove(_test_path)
+    except OSError:
+        print(f"WARNING: Uploads folder '{upload_folder}' is not writable. File uploads will fail.")
+
+    # แจ้งเตือนเรื่อง ephemeral filesystem บน cloud platforms
+    if _is_production:
+        abs_upload = os.path.abspath(upload_folder)
+        print(
+            f"INFO: Files are stored at '{abs_upload}'. "
+            "On cloud platforms (Heroku/Railway/Render) this folder is ephemeral — "
+            "files will be lost on restart. Use a VPS with persistent disk or configure cloud storage."
+        )
+
     # สร้างโฟลเดอร์แบบอักษรหากไม่มีอยู่จริง
     if not os.path.exists('static/fonts'):
         os.makedirs('static/fonts')
@@ -1287,6 +1571,7 @@ def initialize_app():
 # ===========================
 
 @app.route('/api/logs', methods=['GET'])
+@limiter.limit("60 per minute")
 def api_logs():
     """ดึงข้อมูล logs"""
     if not session.get('admin_logged_in'):
@@ -1308,6 +1593,7 @@ def api_logs():
     return jsonify([log.to_dict() for log in logs])
 
 @app.route('/api/logs/submission/<int:submission_id>', methods=['GET'])
+@limiter.limit("60 per minute")
 def api_logs_by_submission(submission_id):
     """ดึง logs ที่เกี่ยวข้องกับ submission"""
     if not session.get('admin_logged_in'):
@@ -1318,6 +1604,7 @@ def api_logs_by_submission(submission_id):
     return jsonify([log.to_dict() for log in logs])
 
 @app.route('/api/tokens', methods=['GET'])
+@limiter.limit("30 per minute")
 def api_tokens():
     """ดึงข้อมูล tokens ทั้งหมด"""
     if not session.get('admin_logged_in'):
@@ -1328,18 +1615,20 @@ def api_tokens():
     return jsonify([token.to_dict() for token in tokens])
 
 @app.route('/api/tokens/<int:token_id>', methods=['DELETE'])
+@limiter.limit("20 per minute")
 def api_revoke_token(token_id):
     """ยกเลิก token"""
     if not session.get('admin_logged_in'):
         return jsonify({'error': 'Unauthorized'}), 401
     
-    token = Token.query.get_or_404(token_id)
+    token = db.get_or_404(Token, token_id)
     token.is_active = False
     db.session.commit()
     
     return jsonify({'status': 'success', 'message': 'Token ยกเลิกสำเร็จ'})
 
 @app.route('/api/tokens/cleanup', methods=['POST'])
+@limiter.limit("5 per minute")
 def api_cleanup_tokens():
     """ลบ tokens ที่หมดอายุ"""
     if not session.get('admin_logged_in'):
@@ -1355,10 +1644,46 @@ def api_cleanup_tokens():
     
     return jsonify({'status': 'success', 'deleted': expired_tokens})
 
+
+@app.after_request
+def apply_security_headers(response):
+    # เพิ่ม header ป้องกันการโจมตีพื้นฐานสำหรับทุก response
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "img-src 'self' data:; "
+        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+        "script-src 'self' 'unsafe-inline'; "
+        "font-src 'self' data: https://cdnjs.cloudflare.com; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "frame-ancestors 'none'; "
+        "form-action 'self'"
+    )
+    if _is_production and request.is_secure:
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
+
+# --------- Lazy Initialization (Safe for Gunicorn) ---------
+# ไม่เรียก initialize_app() ใน else (module import)
+# ให้ Flask app startup hooks จัดการแทน
+_initialized = False
+
+@app.before_request
+def _lazy_initialize():
+    global _initialized
+    if not _initialized:
+        initialize_app()
+        _initialized = True
+
 if __name__ == '__main__':
     # สำหรับการพัฒนา local
     initialize_app()
-    app.run(debug=True, host='127.0.0.1', port=5000)
-else:
-    # สำหรับ production deployment
-    initialize_app()
+    app.run(
+        debug=get_env_bool('FLASK_DEBUG', False),
+        host=os.environ.get('FLASK_HOST', '127.0.0.1'),
+        port=get_env_int('PORT', 5000)
+    )

@@ -82,23 +82,23 @@ document.addEventListener('DOMContentLoaded', function() {
     const int42SelectedAmountInput = document.getElementById('int_42_selected_amount');
     const int42ActualUsedAmountInput = document.getElementById('int_42_actual_used_amount');
     const int42ResultAmountOutput = document.getElementById('int_42_result_amount');
-    const int41SelectedAmountInput = document.getElementById('int_41_selected_amount');
-    const int41ActualUsedAmountInput = document.getElementById('int_41_actual_used_amount');
-    const int41ResultAmountOutput = document.getElementById('int_41_result_amount');
-    const int41DeductionLabel = document.getElementById('int_41_deduction_label');
+    // const int41SelectedAmountInput = document.getElementById('int_41_selected_amount');
+    // const int41ActualUsedAmountInput = document.getElementById('int_41_actual_used_amount');
+    // const int41ResultAmountOutput = document.getElementById('int_41_result_amount');
+    // const int41DeductionLabel = document.getElementById('int_41_deduction_label');
 
-    function updateInt41DeductionLabel() {
-        if (!int41DeductionLabel) {
-            return;
-        }
+    // function updateInt41DeductionLabel() {
+    //     if (!int41DeductionLabel) {
+    //         return;
+    //     }
 
-        if (chargeIntCheckbox && chargeIntCheckbox.checked) {
-            const chargeIntAmount = parseFloat(chargeIntAmountInput?.value) || 0;
-            int41DeductionLabel.textContent = `หักจากข้อ 4.1  ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์: ${chargeIntAmount.toFixed(2)} บาท`;
-        } else {
-            int41DeductionLabel.textContent = '';
-        }
-    }
+    //     if (chargeIntCheckbox && chargeIntCheckbox.checked) {
+    //         const chargeIntAmount = parseFloat(chargeIntAmountInput?.value) || 0;
+    //         int41DeductionLabel.textContent = `หักจากข้อ 4.1  ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์: ${chargeIntAmount.toFixed(2)} บาท`;
+    //     } else {
+    //         int41DeductionLabel.textContent = '';
+    //     }
+    // }
 
     function calculateIntShare() {
         if (!shareIntBaseAmountInput || !shareIntNumInstitutesInput || !shareIntFinalAmountOutput) {
@@ -147,14 +147,28 @@ document.addEventListener('DOMContentLoaded', function() {
         const actualUsedAmount = parseFloat(int42ActualUsedAmountInput.value) || 0;
 
         if (selectedAmount > 0 && actualUsedAmount >= 0 && int42ActualUsedAmountInput.value !== '') {
-            const resultAmount = actualUsedAmount - selectedAmount;
+            const resultAmount = selectedAmount - actualUsedAmount;
             int42ResultAmountOutput.value = resultAmount.toFixed(2);
         } else {
             int42ResultAmountOutput.value = '';
         }
 
         adjustInt42ResultWidth();
-        calculateInt41Result();
+        // calculateInt41Result();
+    }
+
+    function getSelectedInternationalQuartileAmount() {
+        const selectedRadio = document.querySelector('input[name="international_quartile"]:checked');
+        if (!selectedRadio) {
+            return '';
+        }
+
+        const rawAmount = parseFloat(selectedRadio.dataset.amount || '');
+        if (Number.isNaN(rawAmount)) {
+            return '';
+        }
+
+        return String(rawAmount);
     }
 
     function adjustInt42ResultWidth() {
@@ -167,80 +181,119 @@ document.addEventListener('DOMContentLoaded', function() {
         int42ResultAmountOutput.style.width = `${widthInCh}ch`;
     }
 
-    function adjustInt41ResultWidth() {
-        if (!int41ResultAmountOutput) {
-            return;
-        }
+    // function adjustInt41ResultWidth() {
+    //     if (!int41ResultAmountOutput) {
+    //         return;
+    //     }
 
-        const textForSizing = int41ResultAmountOutput.value || int41ResultAmountOutput.placeholder || '';
-        const widthInCh = Math.max(textForSizing.length + 1, 6);
-        int41ResultAmountOutput.style.width = `${widthInCh}ch`;
-    }
+    //     const textForSizing = int41ResultAmountOutput.value || int41ResultAmountOutput.placeholder || '';
+    //     const widthInCh = Math.max(textForSizing.length + 1, 6);
+    //     int41ResultAmountOutput.style.width = `${widthInCh}ch`;
+    // }
 
-    function calculateInt41Result() {
-        if (!int41SelectedAmountInput || !int41ActualUsedAmountInput || !int41ResultAmountOutput) {
-            return;
-        }
+    // function calculateInt41Result() {
+    //     if (!int41SelectedAmountInput || !int41ActualUsedAmountInput || !int41ResultAmountOutput) {
+    //         return;
+    //     }
 
-        const selectedAmountValue = (chargeIntCheckbox && chargeIntCheckbox.checked && chargeIntAmountInput)
-            ? (chargeIntAmountInput.value || '')
-            : '';
+    //     const selectedAmountValue = (chargeIntCheckbox && chargeIntCheckbox.checked && chargeIntAmountInput)
+    //         ? (chargeIntAmountInput.value || '')
+    //         : '';
 
-        int41SelectedAmountInput.value = selectedAmountValue;
-        int41ActualUsedAmountInput.value = int42ResultAmountOutput ? (int42ResultAmountOutput.value || '') : '';
+    //     int41SelectedAmountInput.value = selectedAmountValue;
+    //     int41ActualUsedAmountInput.value = int42ResultAmountOutput ? (int42ResultAmountOutput.value || '') : '';
 
-        const selectedAmount = parseFloat(int41SelectedAmountInput.value) || 0;
-        const actualUsedAmount = parseFloat(int41ActualUsedAmountInput.value) || 0;
+    //     const selectedAmount = parseFloat(int41SelectedAmountInput.value) || 0;
+    //     const actualUsedAmount = parseFloat(int41ActualUsedAmountInput.value) || 0;
 
-        if (int41ActualUsedAmountInput.value !== '') {
-            const resultAmount = actualUsedAmount - selectedAmount;
-            int41ResultAmountOutput.value = resultAmount.toFixed(2);
-        } else {
-            int41ResultAmountOutput.value = '';
-        }
+    //     if (int41ActualUsedAmountInput.value !== '') {
+    //         const resultAmount = actualUsedAmount - selectedAmount;
+    //         int41ResultAmountOutput.value = resultAmount.toFixed(2);
+    //     } else {
+    //         int41ResultAmountOutput.value = '';
+    //     }
 
-        updateInt41DeductionLabel();
-        adjustInt41ResultWidth();
-    }
+    //     updateInt41DeductionLabel();
+    //     adjustInt41ResultWidth();
+    // }
 
     function syncSection42BaseAmountFromSelectedRadio() {
         if (intQuartileRadios.length === 0) {
             return;
         }
-        const selectedRadio = document.querySelector('input[name="international_quartile"]:checked');
-        const amount = selectedRadio ? (selectedRadio.dataset.amount || '') : '';
+        const amount = getSelectedInternationalQuartileAmount();
 
         if (shareIntBaseAmountInput) {
             // Use base amount for share calculation only when share option is checked.
             shareIntBaseAmountInput.value = (shareIntCheckbox && shareIntCheckbox.checked) ? amount : '';
         }
-        if (int42SelectedAmountInput) {
-            int42SelectedAmountInput.value = amount;
+    }
+
+    function syncInt42SelectedAmountFromChargeInput() {
+        if (!int42SelectedAmountInput) {
+            return;
+        }
+
+        if (chargeIntCheckbox && chargeIntCheckbox.checked && chargeIntAmountInput) {
+            int42SelectedAmountInput.value = chargeIntAmountInput.value || '';
+        } else {
+            int42SelectedAmountInput.value = '';
         }
     }
 
-    if (intQuartileRadios.length > 0) {
-        intQuartileRadios.forEach(radio => radio.addEventListener('change', function() {
-            syncSection42BaseAmountFromSelectedRadio();
-            calculateIntShare();
+    // ดึงค่าจาก 4.2 มาใส่ในช่อง int_42_actual_used_amount อัตโนมัติ
+    function syncInt42ActualUsedAmount() {
+        if (!int42ActualUsedAmountInput) {
+            return;
+        }
+
+        if (!remunerationIntCheckbox || !remunerationIntCheckbox.checked) {
+            int42ActualUsedAmountInput.value = '';
             calculateInt42Result();
-        }));
+            return;
+        }
+
+        const quartileAmount = getSelectedInternationalQuartileAmount();
+        const hasSharedAmount = !!(
+            shareIntCheckbox &&
+            shareIntCheckbox.checked &&
+            shareIntFinalAmountOutput &&
+            shareIntFinalAmountOutput.value !== ''
+        );
+
+        // Default to the selected 4.2 radio amount; when share result exists, override with the proportional amount.
+        int42ActualUsedAmountInput.value = hasSharedAmount ? shareIntFinalAmountOutput.value : quartileAmount;
+
+        calculateInt42Result();
+    }
+
+    if (intQuartileRadios.length > 0) {
+        intQuartileRadios.forEach(function(radio) {
+            radio.addEventListener('change', function() {
+                syncSection42BaseAmountFromSelectedRadio();
+                calculateIntShare();
+                syncInt42ActualUsedAmount();
+            });
+        });
     }
 
     if (shareIntNumInstitutesInput) {
-        shareIntNumInstitutesInput.addEventListener('input', calculateIntShare);
+        shareIntNumInstitutesInput.addEventListener('input', function() {
+            calculateIntShare();
+            syncInt42ActualUsedAmount();
+        });
     }
     if (shareIntCheckbox) {
-        shareIntCheckbox.addEventListener('change', updateIntShareAvailability);
-    }
-    if (chargeIntCheckbox) {
-        chargeIntCheckbox.addEventListener('change', calculateInt41Result);
+        shareIntCheckbox.addEventListener('change', function() {
+            updateIntShareAvailability();
+            syncInt42ActualUsedAmount();
+        });
     }
     if (chargeIntAmountInput) {
-        chargeIntAmountInput.addEventListener('input', calculateInt41Result);
-    }
-    if (int42ActualUsedAmountInput) {
-        int42ActualUsedAmountInput.addEventListener('input', calculateInt42Result);
+        chargeIntAmountInput.addEventListener('input', function() {
+            syncInt42SelectedAmountFromChargeInput();
+            calculateInt42Result();
+        });
     }
 
     function updateChargeIntAvailability() {
@@ -255,7 +308,10 @@ document.addEventListener('DOMContentLoaded', function() {
             chargeIntAmountInput.value = '';
         }
 
-        calculateInt41Result();
+        syncInt42SelectedAmountFromChargeInput();
+        calculateInt42Result();
+
+        // calculateInt41Result();
     }
 
     if (chargeIntCheckbox) {
@@ -264,12 +320,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     syncSection42BaseAmountFromSelectedRadio();
     updateChargeIntAvailability();
+    syncInt42SelectedAmountFromChargeInput();
     updateIntShareAvailability();
     calculateIntShare();
+    syncInt42ActualUsedAmount();
     calculateInt42Result();
-    calculateInt41Result();
+    // calculateInt41Result();
     adjustInt42ResultWidth();
-    adjustInt41ResultWidth();
+    // adjustInt41ResultWidth();
 
     if (remunerationIntCheckbox && intQuartileRadios.length > 0) {
         bindRadioGroupToMainCheckbox(
@@ -278,9 +336,11 @@ document.addEventListener('DOMContentLoaded', function() {
             function() {
                 syncSection42BaseAmountFromSelectedRadio();
                 calculateIntShare();
-                calculateInt42Result();
+                syncInt42ActualUsedAmount();
             }
         );
+    } else if (remunerationIntCheckbox) {
+        remunerationIntCheckbox.addEventListener('change', syncInt42ActualUsedAmount);
     }
 
     // --- Calculation for Section 5.1 ---
@@ -437,10 +497,19 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
         calculateCreativeShare();
     }
 
-    // 5. เพิ่ม Event Listener ให้กับ Checkbox ทุกอัน
-    // เมื่อมีการ ติ๊ก/ยกเลิกติ๊ก ที่อันไหนก็ตาม ให้เรียกฟังก์ชันอัปเดตยอดรวม
+    // 5. บังคับให้เลือกได้เพียง 1 ข้อในกลุ่มระดับงานสร้างสรรค์
     creativeCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', updateCreativeBaseAmount);
+        checkbox.addEventListener('change', function() {
+            if (this.checked) {
+                creativeCheckboxes.forEach(otherCheckbox => {
+                    if (otherCheckbox !== this) {
+                        otherCheckbox.checked = false;
+                    }
+                });
+            }
+
+            updateCreativeBaseAmount();
+        });
     });
 
     // 6. เพิ่ม Event Listener ให้กับช่องกรอกจำนวนสถาบัน (เหมือนเดิม)
@@ -625,6 +694,17 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
         const popupFeedbackLink = successPopup.querySelector('#popup-feedback-link');
         const popupClose = successPopup.querySelector('#popup-close');
         const popupContent = successPopup.querySelector('.popup-content');
+        const fileInputs = mainForm.querySelectorAll('input[type="file"]');
+        const allowedExtensionsByField = {
+            evidence_proof_upload: ['pdf', 'jpg', 'jpeg', 'png']
+        };
+        const defaultAllowedExtensions = ['pdf'];
+
+        fileInputs.forEach((input) => {
+            const allowedExtensions = allowedExtensionsByField[input.name] || defaultAllowedExtensions;
+            const acceptValue = allowedExtensions.map((ext) => `.${ext}`).join(',');
+            input.setAttribute('accept', acceptValue);
+        });
 
         function getFeedbackLink(responseData = {}) {
             const responseLink = (responseData.feedback_link || '').trim();
@@ -651,6 +731,31 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
             popupFeedback.style.display = 'block';
         }
 
+        function validateAllowedUploads() {
+            for (const input of fileInputs) {
+                if (!input.files || input.files.length === 0) {
+                    continue;
+                }
+
+                const allowedExtensions = allowedExtensionsByField[input.name] || defaultAllowedExtensions;
+
+                for (const file of input.files) {
+                    const fileName = (file.name || '').toLowerCase();
+                    const isAllowed = allowedExtensions.some((ext) => fileName.endsWith(`.${ext}`));
+
+                    if (!isAllowed) {
+                        const allowedLabel = allowedExtensions.map((ext) => `.${ext}`).join(', ');
+                        return {
+                            isValid: false,
+                            message: `ไฟล์ "${file.name}" ไม่ถูกต้อง ช่องนี้รองรับเฉพาะ ${allowedLabel} เท่านั้น`
+                        };
+                    }
+                }
+            }
+
+            return { isValid: true };
+        }
+
         mainForm.addEventListener('submit', function(event) {
             event.preventDefault();
             
@@ -664,13 +769,24 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
                 successPopup.style.display = 'flex';
                 return;
             }
+
+            const uploadValidationResult = validateAllowedUploads();
+            if (!uploadValidationResult.isValid) {
+                popupContent.classList.add('error');
+                popupTitle.textContent = 'กรุณาตรวจสอบไฟล์แนบ';
+                popupMessage.textContent = uploadValidationResult.message;
+                hideFeedbackLink();
+                successPopup.style.display = 'flex';
+                return;
+            }
             
             submitButton.textContent = 'กำลังส่งข้อมูล...';
             submitButton.disabled = true;
             
             const formData = new FormData(mainForm);
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
-            fetch('/', { method: 'POST', body: formData })
+            fetch('/', { method: 'POST', body: formData, headers: { 'X-CSRFToken': csrfToken } })
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
@@ -727,8 +843,9 @@ if (creativeCheckboxes.length > 0 && creativeBaseAmountInput && creativeNumInsti
         loginForm.addEventListener('submit', function(event) {
             event.preventDefault();
             const formData = new FormData(loginForm);
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
-            fetch('/login', { method: 'POST', body: formData })
+            fetch('/login', { method: 'POST', body: formData, headers: { 'X-CSRFToken': csrfToken } })
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {

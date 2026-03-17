@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>แบบฟอร์มขอรับการสนับสนุนการตีพิมพ์บทความวิจัย</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
@@ -16,7 +17,6 @@
     <button id="admin-login-btn" class="admin-login-button">Admin Login</button>
 </header>
     <div class="container">
-        
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -26,7 +26,6 @@
         {% endwith %}
 
         <form id="main-form" method="post" enctype="multipart/form-data" data-feedback-link="{{ feedback_link or '' }}">
-            
             <fieldset>
                 <legend>ประวัติผู้ขอรับการสนับสนุน</legend>
                 <div class="form-group">
@@ -97,7 +96,7 @@
             </fieldset>
 
             <fieldset>
-                <legend>รายละเอียดผลงาน (กรุณาขีดเครื่องหมาย ✓ หน้าข้อความที่ตรงกับคุณสมบัติ)</legend>                
+                <legend>รายละเอียดผลงาน (กรุณาขีดเครื่องหมาย ✓ หน้าข้อความที่ตรงกับคุณสมบัติ)</legend>
                 <div class="form-group">
                     <label for="work_name_th">ชื่อผลงาน/บทความ (ภาษาไทย):</label>
                     <input type="text" id="work_name_th" name="work_name_th">
@@ -120,32 +119,32 @@
                     <label for="project_name">ชื่อโครงการวิจัย:</label>
                     <input type="text" id="project_name" name="project_name">
                 </div>
-                
+
                 <fieldset class="inner-fieldset">
                     <legend>1. คุณสมบัติของผู้ขอรับการสนับสนุนการตีพิมพบทความวิจัยมหาวิทยาลัยเทคโนโลยีราชมงคลธัญบุรี </legend>
                     <div class="checkbox-group">
                         <input type="checkbox" id="qual_1_1" name="qual_1_1" value="true">
                         <label for="qual_1_1">1.1 เป็นนักวิจัยของมหาวิทยาลัย และปฏิบัติราชการเต็มเวลามาแล้วไม่น้อยกว่า 9 เดือน โดยนับตั้งแต่วันที่ได้รับการบรรจุและแต่งตั้ง 
-                                                  จนถึงวันที่เสนอขอรับการสนับสนุน และไม่อยู่ระหว่างลาศึกษาต่อ</label>
+                                                จนถึงวันที่เสนอขอรับการสนับสนุน และไม่อยู่ระหว่างลาศึกษาต่อ</label>
                     </div>
                     <div class="checkbox-group">
                         <input type="checkbox" id="qual_1_2" name="qual_1_2" value="true">
                         <label for="qual_1_2">1.2 เป็นผู้เขียนชื่อแรก (First  author) หรือเป็นผู้รับผิดชอบหลัก (Corresponding  author) ที่ระบุชื่อหน่วยงานของ
-                                                  มหาวิทยาลัยเทคโนโลยีราชมงคลธัญบุรี ที่ตำแหน่งที่อยู่ของผู้เขียน ปรากฏในบทความอย่างชัดเจน และปรากฏ E-mail 
-                                                  ติดต่อผู้เขียนด้วย E-mail มหาวิทยาลัย (กรณีที่ทั้งผู้เขียนชื่อแรกและผู้เขียนชื่อหลักมีคุณสมบัติตามข้อ 1.1 จะให้การ
-                                                  สนับสนุนเฉพาะ ผู้เขียนชื่อแรก แต่ถ้าผู้เขียนที่เป็นชื่อหลักมีความประสงค์จะขอรับการสนับสนุนแทน จะต้องมีหนังสือยินยอม
-                                                  จากผู้เขียนชื่อแรกแนบพร้อมแบบฟอร์ม IRD_06)</label>
+                                                มหาวิทยาลัยเทคโนโลยีราชมงคลธัญบุรี ที่ตำแหน่งที่อยู่ของผู้เขียน ปรากฏในบทความอย่างชัดเจน และปรากฏ E-mail 
+                                                ติดต่อผู้เขียนด้วย E-mail มหาวิทยาลัย (กรณีที่ทั้งผู้เขียนชื่อแรกและผู้เขียนชื่อหลักมีคุณสมบัติตามข้อ 1.1 จะให้การ
+                                                สนับสนุนเฉพาะ ผู้เขียนชื่อแรก แต่ถ้าผู้เขียนที่เป็นชื่อหลักมีความประสงค์จะขอรับการสนับสนุนแทน จะต้องมีหนังสือยินยอม
+                                                จากผู้เขียนชื่อแรกแนบพร้อมแบบฟอร์ม IRD_06)</label>
                     </div>
                     <div class="checkbox-group">
                         <input type="checkbox" id="qual_1_3" name="qual_1_3" value="true">
                         <label for="qual_1_3">1.3 กรณีเผยแพร่งานสร้างสรรค์ ต้องมีชื่อผู้สร้างสรรค์เป็นผู้จัดทำ พร้อมทั้งระบุชื่อมหาวิทยาลัย เทคโนโลยีราชมงคลธัญบุรีไว้
-                                                  ที่ตำแหน่งที่อยู่ของผลงานสร้างสรรค์ด้วย </label>
+                                                ที่ตำแหน่งที่อยู่ของผลงานสร้างสรรค์ด้วย </label>
                     </div>
                 </fieldset>
 
                 <fieldset class="inner-fieldset">
                     <legend>2. ขอบเขตของบทความวิจัยหรืองานสร้างสรรค์ที่ขอรับการสนับสนุนค่าสมนาคุณ (ตามประกาศฯ เรื่องหลักเกณฑ์ การจ่ายเงิน และค่าสมนาคุณ
-                               การเผยแพร่ผลงานวิจัยหรืองานสร้างสรรค์) </legend>
+                            การเผยแพร่ผลงานวิจัยหรืองานสร้างสรรค์) </legend>
                     <div class="checkbox-group">
                         <input type="checkbox" id="scope_2_1" name="scope_2_1" value="true">
                         <label for="scope_2_1">2.1 เป็นบทความวิจัยหรืองานสร้างสรรค์ที่ไม่เคยเผยแพร่ที่ใดมาก่อนหรือเผยแพร่ไม่เกิน 1 ปี</label>
@@ -154,8 +153,8 @@
                     <div class="checkbox-group">
                         <input type="checkbox" id="scope_2_2" name="scope_2_2" value="true">
                         <label for="scope_2_2">2.2 บทความวิจัยที่ขอรับการสนับสนุนต้องไม่เป็นส่วนหนึ่งของผลงานวิจัยที่สำเร็จการศึกษาของ ผู้รับการสนับสนุนผลงานวิจัย
-                                                   และไม่รวมถึงจดหมายถึงบรรณาธิการ (Letter to editor,Short communication note) 
-                                                   หรืองานเขียนขึ้นที่ลักษณะคล้ายกับที่กล่าวข้างต้น</label>
+                                                และไม่รวมถึงจดหมายถึงบรรณาธิการ (Letter to editor,Short communication note)
+                                                หรืองานเขียนขึ้นที่ลักษณะคล้ายกับที่กล่าวข้างต้น</label>
                     </div>
                     <div class="checkbox-group">
                         <input type="checkbox" id="scope_2_3" name="scope_2_3" value="true">
@@ -164,7 +163,7 @@
                 </fieldset>
 
                 <fieldset class="inner-fieldset">
-                    <legend>3. หลักเกณฑ์การจ่ายเงิน และรางวัลสนับสนุนการตีพิมพ์บทความวิจัย กรณีตีพิมพ์ในวารสารระดับชาติ</legend>    
+                    <legend>3. หลักเกณฑ์การจ่ายเงิน และรางวัลสนับสนุนการตีพิมพ์บทความวิจัย กรณีตีพิมพ์ในวารสารระดับชาติ</legend>
                     <div class="checkbox-group vertical-input-group">
                     <div class="main-label-line">
                         <input type="checkbox" id="payment_3_1" name="payment_3_1" value="true">
@@ -175,25 +174,25 @@
                         <input type="number" id="page_charge_amount" name="page_charge_amount" placeholder="0" class="inline-input" min="0" max="9999999">
                         <span>บาท</span>
                     </div>
-                    </div>    
+                    </div>
                     <div class="checkbox-group">
                         <input type="checkbox" id="payment_3_2" name="payment_3_2" value="true">
                         <label for="payment_3_2">3.2 ค่าสมนาคุณการตีพิมพ์บทความวิจัยในวารสารระดับชาติที่อยู่ในฐานข้อมูล TCI กลุ่ม 1 หรือ กลุ่ม 2 
-                                                     จ่ายเงินค่าสมนาคุณการตีพิมพ์บทความวิจัย 4,000 บาท</label>
+                                                    จ่ายเงินค่าสมนาคุณการตีพิมพ์บทความวิจัย 4,000 บาท</label>
                     </div>
                     <div class="checkbox-group vertical-input-group">
                     <div class="main-label-line">
                         <input type="checkbox" id="payment_3_3" name="payment_3_3" value="true">
                         <label for="payment_3_3">3.3 กรณีผู้ขอรับการสนับสนุนเขียนบทความวิจัยโดยทำงานร่วมกับสถาบันอื่น จะจ่ายค่าสมนาคุณตามสัดส่วน 
-                                                     (4,000 บาท ÷ จำนวนสถาบันทั้งหมด)</label>
+                                                    (4,000 บาท ÷ จำนวนสถาบัน)</label>
                     </div>
                     <div class="input-line">
-                        <label class="sub-label" for="num_institutes_3_3">จำนวนสถาบันทั้งหมด:</label>
+                        <label class="sub-label" for="num_institutes_3_3">จำนวนสถาบัน:</label>
                         <input type="number" id="num_institutes_3_3" name="num_institutes_3_3" placeholder="0" class="inline-input-small">
-                        <span>สถาบัน</span> <span>=</span> 
+                        <span class="nowrap-text">ค่าสมนาคุณที่ได้รับ</span> <span>=</span>
                         <input type="text" id="share_amount_3_3" name="share_amount_3_3" class="inline-input-small" readonly>
                         <span>บาท</span>
-                    </div>                        
+                    </div>
                     </div>
                     <p class="form-note"> <B>หมายเหตุ</B> {{ form_notes.payment_3_3 }}</p>
                 </fieldset>
@@ -204,30 +203,54 @@
                     <div class="main-label-line">
                         <input type="checkbox" id="charge_int_checkbox" name="charge_int_checkbox" value="true">
                         <label for="charge_int_checkbox">4.1 ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์ (Page charge) ในวารสารวิชาการที่ปรากฏในฐานข้อมูลสากล
-                                                             ที่อยู่ในกลุ่มอันดับสูงสุดร้อยละสิบ (Top 10% หรือ Tier 1) และ  ที่อยู่ในกลุ่ม Q1 และ Q2 
-                                                             ให้สนับสนุนตามที่จ่ายจริงหลังหักค่าสมนาคุณการตีพิมพ์บทความวิจัยตามข้อ 4.2 แต่ไม่เกิน แต่ไม่เกิน 
-                                                             10,000 บาท ต่อเรื่อง</label>
+                                                            ที่อยู่ในกลุ่มอันดับสูงสุดร้อยละสิบ (Top 10% หรือ Tier 1) และ  ที่อยู่ในกลุ่ม Q1 และ Q2
+                                                            ให้สนับสนุนตามที่จ่ายจริงหลังหักค่าสมนาคุณการตีพิมพ์บทความวิจัยตามข้อ 4.2 แต่ไม่เกิน แต่ไม่เกิน
+                                                            10,000 บาท ต่อเรื่อง</label>
                     </div>
-                    <div class="input-line">
+                    <div class="input-line charge-int-line">
                         <label class="sub-label" for="charge_int_amount">โปรดระบุจำนวนเงิน:</label>
-                        <input type="number" id="charge_int_amount" name="charge_int_amount" placeholder="0" class="inline-input" min="0" max="9999999">
+                        <input type="number" id="charge_int_amount" name="charge_int_amount" placeholder="ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์ (Page Charge) " class="inline-input" min="0" max="9999999">
                         <span>บาท</span>
                     </div>
                     </div>
+
+                    <hr class="section-divider">
+
+                    <div class="formula-calculation">
+                        <label class="formula-label">ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์:</label>
+                        <div class="formula-container with-result-below">
+                            <div class="formula-item">
+                                <input type="text" id="int_42_selected_amount" name="int_42_selected_amount" placeholder="ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์ (Page Charge)" class="formula-input" readonly>
+                            </div>
+                            <span class="formula-operator">−</span>
+                            <div class="formula-item">
+                                <input type="text" id="int_42_actual_used_amount" name="int_42_actual_used_amount" placeholder="ค่าสมนาคุณ ข้อ 4.2" class="formula-input" readonly>
+                            </div>
+                            <span class="formula-break" aria-hidden="true"></span>
+                            <span class="formula-operator">=</span>
+                            <div class="formula-item result-item">
+                                <input type="text" id="int_42_result_amount" name="int_42_result_amount" placeholder="ผลลัพธ์" class="formula-input" readonly>
+                                <small class="formula-helper">บาท</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="section-divider">
+
                     <div class="checkbox-group">
                         <input type="checkbox" id="remuneration_int_checkbox" name="remuneration_int_checkbox" value="true">
                         <label for="remuneration_int_checkbox">4.2 ค่าสมนาคุณการตีพิมพ์บทความวิจัยในวารสารระดับนานาชาติให้ใช้ค่าควอไทล์ที่ปรากฎใน ฐานข้อมูลการ
-                                                                   จัดอันดับวารสาร Scopus โดยพิจารณาจากปีล่าสุดที่ปรากฎอยู่ในฐานข้อมูล ณ วันที่บทความได้รับการ
-                                                                   ตีพิมพ์ ดังนี้</label>
-                    </div>    
+                                                                จัดอันดับวารสาร Scopus โดยพิจารณาจากปีล่าสุดที่ปรากฎอยู่ในฐานข้อมูล ณ วันที่บทความได้รับการ
+                                                                ตีพิมพ์ ดังนี้</label>
+                    </div>
                     <div class="sub-options">
-                    <div class="radio-group"><input type="radio" name="international_quartile" value="top10" data-amount="60000"><label>Top 10% หรือ Tier 1 สนับสนุน 60,000 บาท</label></div>
-                    <div class="radio-group"><input type="radio" name="international_quartile" value="q1" data-amount="30000"><label>ควอไทล์ที่ 1 (Q1) สนับสนุน 30,000 บาท</label></div>
-                    <div class="radio-group"><input type="radio" name="international_quartile" value="q2" data-amount="20000"><label>ควอไทล์ที่ 2 (Q2) สนับสนุน 20,000 บาท</label></div>
-                    <div class="radio-group"><input type="radio" name="international_quartile" value="q3" data-amount="10000"><label>ควอไทล์ที่ 3 (Q3) สนับสนุน 10,000 บาท</label></div>
-                    <div class="radio-group"><input type="radio" name="international_quartile" value="q4" data-amount="8000"><label>ควอไทล์ที่ 4 (Q4) สนับสนุน 8,000 บาท</label></div>
-                    <div class="radio-group"><input type="radio" name="international_quartile" value="none" data-amount="4000"><label>ไม่มีควอไทล์ สนับสนุน 4,000 บาท</label></div>
-                    </div>                    
+                    <div class="radio-group"><input type="radio" id="international_quartile_top10" name="international_quartile" value="top10" data-amount="60000"><label for="international_quartile_top10">Top 10% หรือ Tier 1 สนับสนุน 60,000 บาท</label></div>
+                    <div class="radio-group"><input type="radio" id="international_quartile_q1" name="international_quartile" value="q1" data-amount="30000"><label for="international_quartile_q1">ควอไทล์ที่ 1 (Q1) สนับสนุน 30,000 บาท</label></div>
+                    <div class="radio-group"><input type="radio" id="international_quartile_q2" name="international_quartile" value="q2" data-amount="20000"><label for="international_quartile_q2">ควอไทล์ที่ 2 (Q2) สนับสนุน 20,000 บาท</label></div>
+                    <div class="radio-group"><input type="radio" id="international_quartile_q3" name="international_quartile" value="q3" data-amount="10000"><label for="international_quartile_q3">ควอไทล์ที่ 3 (Q3) สนับสนุน 10,000 บาท</label></div>
+                    <div class="radio-group"><input type="radio" id="international_quartile_q4" name="international_quartile" value="q4" data-amount="8000"><label for="international_quartile_q4">ควอไทล์ที่ 4 (Q4) สนับสนุน 8,000 บาท</label></div>
+                    <div class="radio-group"><input type="radio" id="international_quartile_none" name="international_quartile" value="none" data-amount="4000"><label for="international_quartile_none">ไม่มีควอไทล์ สนับสนุน 4,000 บาท</label></div>
+                    </div>
                     <div class="checkbox-group vertical-input-group">
                     <div class="main-label-line">
                         <input type="checkbox" id="share_int_checkbox" name="share_int_checkbox" value="true">
@@ -238,27 +261,14 @@
                         <label class="sub-label">คำนวณ:</label>
                         <input type="text" id="share_int_base_amount" name="share_int_base_amount" placeholder="เงินฐาน" class="input-sm" readonly>
                         <span>÷</span>
-                        <input type="number" id="share_int_num_institutes" name="share_int_num_institutes" placeholder="จำนวนสถาบันทั้งหมด" class="inline-input-small">
+                        <input type="number" id="share_int_num_institutes" name="share_int_num_institutes" placeholder="จำนวนสถาบัน" class="inline-input-small">
                         <span>=</span>
-                        <input type="text" id="share_int_final_amount" name="share_int_final_amount" placeholder="ผลลัพธ์" class="inline-input-small" readonly>
+                        <input type="text" id="share_int_final_amount" name="share_int_final_amount" placeholder="ผลลัพธ์" class="input-sm" readonly>
                         <span>บาท</span>
                     </div>
                     </div>
 
-                    <hr class="section-divider">
-                    
-                    <div class="input-line">
-                        <label class="sub-label">คำนวณเงินใช้จริง:</label>
-                        <input type="text" id="int_42_selected_amount" name="int_42_selected_amount" placeholder="เงินสนับสนุน 4.2" class="inline-input-small int42-text-input" readonly>
-                        <span>-</span>
-                        <input type="number" id="int_42_actual_used_amount" name="int_42_actual_used_amount" placeholder="เงินที่ใช้จริง" class="inline-input-small int42-text-input" min="0">
-                        <span>=</span>
-                        <input type="text" id="int_42_result_amount" name="int_42_result_amount" placeholder="ยอดเงินที่ออกเองทั้งหมด" class="inline-input-small" readonly>
-                        <span>บาท</span>
-                    </div>
-                    
-                    <hr class="section-divider">
-
+                    <!--
                     <div class="input-line">
                         <label class="sub-label">คำนวณเงินที่หักลบจากข้อ 4.1 :</label>
                         <input type="text" id="int_41_selected_amount" name="int_41_selected_amount" placeholder="เงินสนับสนุน 4.1" class="inline-input-small int42-text-input" readonly>
@@ -268,15 +278,16 @@
                         <input type="text" id="int_41_result_amount" name="int_41_result_amount" placeholder="ยอดเงินที่ออกเองทั้งหมด" class="inline-input-small" readonly>
                         <span>บาท</span>
                     </div>
+                    -->
                     <p class="form-note form-note-warning">
                         <strong>หมายเหตุ:</strong> {{ form_notes.int_overlimit_warning }}
                     </p>
 
                 </fieldset>
-                
+
                 <fieldset class="inner-fieldset">
                     <legend>5. กรณีตีพิมพ์ในวารสาร ประเภทบทความวิจัยที่ถูกคัดเลือกมาจากการประชุมวิชาการและนำมาตีพิมพ์ลงใน
-                             วารสาร (Journal) และเป็นฉบับพิเศษ (Special Issue)</legend>
+                            วารสาร (Journal) และเป็นฉบับพิเศษ (Special Issue)</legend>
                     <div class="checkbox-group vertical-input-group">
                     <div class="main-label-line">
                         <input type="checkbox" id="special_nat_checkbox" name="special_nat_checkbox" value="true">
@@ -288,7 +299,7 @@
                         จะจ่ายค่าสมนาคุณการเผยแพร่ผลงานวิจัยหรืองานสร้างสรรค์ตามสัดส่วน ในการรับเงินสนับสนุน </label>
                     </div>
                     <div class="complex-input-group">
-                        <input type="number" id="special_nat_share_num_institutes" name="special_nat_share_num_institutes" placeholder="จำนวนสถาบันทั้งหมด" class="adjustable-input">
+                        <input type="number" id="special_nat_share_num_institutes" name="special_nat_share_num_institutes" placeholder="จำนวนสถาบัน" class="adjustable-input">
                         <span>=</span>
                         <input type="text" id="special_nat_share_final_amount" name="special_nat_share_final_amount" placeholder="ผลลัพธ์" class="inline-input-small" readonly>
                         <span>บาท</span>
@@ -300,12 +311,12 @@
                         <label for="special_int_checkbox">5.2 กรณีวารสารระดับนานาชาติและปรากฏในฐานข้อมูลสากล สนับสนุน 1 ใน 4 ของข้อ 4.2 ดังนี้ </label>
                     </div>
                     <div class="sub-options">
-                    <div class="radio-group"><input type="radio" name="special_international_quartile" value="top10" data-amount="15000"><label>Top 10% หรือ Tier 1 สนับสนุน 15,000 บาท</label></div>
-                    <div class="radio-group"><input type="radio" name="special_international_quartile" value="q1" data-amount="7500"><label> ควอไทล์ที่ 1 (Q1) สนับสนุน 7,500 บาท</label></div>
-                    <div class="radio-group"><input type="radio" name="special_international_quartile" value="q2" data-amount="5000"><label> ควอไทล์ที่ 2 (Q2) สนับสนุน 5,000 บาท</label></div>
-                    <div class="radio-group"><input type="radio" name="special_international_quartile" value="q3" data-amount="2500"><label> ควอไทล์ที่ 3 (Q3) สนับสนุน 2,500 บาท</label></div>
-                    <div class="radio-group"><input type="radio" name="special_international_quartile" value="q4" data-amount="2000"><label> ควอไทล์ที่ 4 (Q4) สนับสนุน 2,000 บาท</label></div>
-                    <div class="radio-group"><input type="radio" name="special_international_quartile" value="none" data-amount="1000"><label>ไม่มีควอไทล์ สนับสนุน 1,000 บาท</label></div>
+                    <div class="radio-group"><input type="radio" id="special_international_quartile_top10" name="special_international_quartile" value="top10" data-amount="15000"><label for="special_international_quartile_top10">Top 10% หรือ Tier 1 สนับสนุน 15,000 บาท</label></div>
+                    <div class="radio-group"><input type="radio" id="special_international_quartile_q1" name="special_international_quartile" value="q1" data-amount="7500"><label for="special_international_quartile_q1"> ควอไทล์ที่ 1 (Q1) สนับสนุน 7,500 บาท</label></div>
+                    <div class="radio-group"><input type="radio" id="special_international_quartile_q2" name="special_international_quartile" value="q2" data-amount="5000"><label for="special_international_quartile_q2"> ควอไทล์ที่ 2 (Q2) สนับสนุน 5,000 บาท</label></div>
+                    <div class="radio-group"><input type="radio" id="special_international_quartile_q3" name="special_international_quartile" value="q3" data-amount="2500"><label for="special_international_quartile_q3"> ควอไทล์ที่ 3 (Q3) สนับสนุน 2,500 บาท</label></div>
+                    <div class="radio-group"><input type="radio" id="special_international_quartile_q4" name="special_international_quartile" value="q4" data-amount="2000"><label for="special_international_quartile_q4"> ควอไทล์ที่ 4 (Q4) สนับสนุน 2,000 บาท</label></div>
+                    <div class="radio-group"><input type="radio" id="special_international_quartile_none" name="special_international_quartile" value="none" data-amount="1000"><label for="special_international_quartile_none">ไม่มีควอไทล์ สนับสนุน 1,000 บาท</label></div>
                     </div>
                     <div class="checkbox-group vertical-input-group">
                     <div class="main-label-line">
@@ -316,13 +327,13 @@
                         <label class="sub-label">คำนวณ:</label>
                         <input type="text" id="special_int_share_base_amount" name="special_int_share_base_amount" placeholder="เงินฐาน" class="input-sm" readonly>
                         <span>÷</span>
-                        <input type="number" id="special_int_share_num_institutes" name="special_int_share_num_institutes" placeholder="จำนวนสถาบันทั้งหมด" class="input-xs">
+                        <input type="number" id="special_int_share_num_institutes" name="special_int_share_num_institutes" placeholder="จำนวนสถาบัน" class="input-xs">
                         <span>=</span>
                         <input type="text" id="special_int_share_final_amount" name="special_int_share_final_amount" placeholder="ผลลัพธ์" class="input-sm" readonly>
                         <span>บาท</span>
                     </div>
                     </div>
-                    <p class="form-note"> <B>หมายเหตุ</B> {{ form_notes.special_int_share }} </p>                    
+                    <p class="form-note"> <B>หมายเหตุ</B> {{ form_notes.special_int_share }} </p>
                 </fieldset>
 
                 <fieldset class="inner-fieldset">
@@ -342,66 +353,66 @@
                         <label class="sub-label">คำนวณ:</label>
                         <input type="text" id="creative_share_base_amount" name="creative_share_base_amount" placeholder="เงินฐาน" class="input-sm" readonly>
                         <span>÷</span>
-                        <input type="number" id="creative_share_num_institutes" name="creative_share_num_institutes" placeholder="จำนวนสถาบันทั้งหมด" class="input-xs">
+                        <input type="number" id="creative_share_num_institutes" name="creative_share_num_institutes" placeholder="จำนวนสถาบัน" class="input-xs">
                         <span>=</span>
                         <input type="text" id="creative_share_final_amount" name="creative_share_final_amount" placeholder="ผลลัพธ์" class="input-sm" readonly>
                         <span>บาท</span>
                     </div>
                     </div>
-                     <p class="form-note"> <b>หมายเหตุ</b> {{ form_notes.creative_support_limit }} </p>
+                    <p class="form-note"> <b>หมายเหตุ</b> {{ form_notes.creative_support_limit }} </p>
                 </fieldset>
 
                 <fieldset>
                     <legend>7. หลักฐานประกอบการเสนอขอรับการสนับสนุน </legend>
                     <div class="checkbox-group file-upload-group">
-                        <input type="checkbox" name="evidence_page_charge_check" value="true">
-                        <label>7.1 ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์ (Page charge) ... พร้อมแนบหลักฐานแสดงการชำระเงิน (ตัวจริง)</label>
-                        <input type="file" name="evidence_page_charge_upload" accept=".pdf">
+                        <input type="checkbox" id="evidence_page_charge_check" name="evidence_page_charge_check" value="true">
+                        <label for="evidence_page_charge_check">7.1 ค่าธรรมเนียมที่ทางวารสารเรียกเก็บเพื่อการตีพิมพ์ (Page charge) ... พร้อมแนบหลักฐานแสดงการชำระเงิน (ตัวจริง)</label>
+                        <input type="file" name="evidence_page_charge_upload" accept=".pdf" aria-label="อัปโหลดหลักฐานการชำระค่าธรรมเนียมตีพิมพ์">
                     </div>
                     <div class="checkbox-group file-upload-group">
-                        <input type="checkbox" name="evidence_full_paper_check" value="true">
-                        <label>7.2 สำเนาหลักฐานการตีพิมพ์ (Full Paper) ที่มี Volume และเลขหน้า หรือเลข DOI พร้อมหน้าปกวารสาร</label>
-                        <input type="file" name="evidence_full_paper_upload" accept=".pdf">
+                        <input type="checkbox" id="evidence_full_paper_check" name="evidence_full_paper_check" value="true">
+                        <label for="evidence_full_paper_check">7.2 สำเนาหลักฐานการตีพิมพ์ (Full Paper) ที่มี Volume และเลขหน้า หรือเลข DOI พร้อมหน้าปกวารสาร</label>
+                        <input type="file" name="evidence_full_paper_upload" accept=".pdf" aria-label="อัปโหลดสำเนาหลักฐานการตีพิมพ์ Full Paper">
                     </div>
                     <div class="checkbox-group file-upload-group">
-                        <input type="checkbox" name="evidence_consent_letter_check" value="true">
-                        <label>7.3 หนังสือยินยอมและสำเนาบัตรประชาชนของผู้เขียนชื่อแรก (กรณีที่ไม่ใช่ผู้เขียนชื่อแรก)</label>
-                        <input type="file" name="evidence_consent_letter_upload" accept=".pdf">
+                        <input type="checkbox" id="evidence_consent_letter_check" name="evidence_consent_letter_check" value="true">
+                        <label for="evidence_consent_letter_check">7.3 หนังสือยินยอมและสำเนาบัตรประชาชนของผู้เขียนชื่อแรก (กรณีที่ไม่ใช่ผู้เขียนชื่อแรก)</label>
+                        <input type="file" name="evidence_consent_letter_upload" accept=".pdf" aria-label="อัปโหลดหนังสือยินยอมและสำเนาบัตรประชาชนของผู้เขียนชื่อแรก">
                     </div>
                     <div class="checkbox-group file-upload-group">
-                        <input type="checkbox" name="evidence_quartile_check" value="true">
-                        <label>7.4 หลักฐานการอ้างอิงค่าควอไทล์(Journal Quartile Score) ... กรณีวารสารระดับนานาชาติ</label>
-                        <input type="file" name="evidence_quartile_upload" accept=".pdf">
+                        <input type="checkbox" id="evidence_quartile_check" name="evidence_quartile_check" value="true">
+                        <label for="evidence_quartile_check">7.4 หลักฐานการอ้างอิงค่าควอไทล์(Journal Quartile Score) ... กรณีวารสารระดับนานาชาติ</label>
+                        <input type="file" name="evidence_quartile_upload" accept=".pdf" aria-label="อัปโหลดหลักฐานอ้างอิงค่าควอไทล์ของวารสาร">
                     </div>
                     <div class="checkbox-group file-upload-group">
-                        <input type="checkbox" name="evidence_tci_check" value="true">
-                        <label>7.5 หลักฐานจากฐานข้อมูล TCI กลุ่ม 1 หรือ 2 กรณีวารสารระดับชาติ</label>
-                        <input type="file" name="evidence_tci_upload" accept=".pdf">
+                        <input type="checkbox" id="evidence_tci_check" name="evidence_tci_check" value="true">
+                        <label for="evidence_tci_check">7.5 หลักฐานจากฐานข้อมูล TCI กลุ่ม 1 หรือ 2 กรณีวารสารระดับชาติ</label>
+                        <input type="file" name="evidence_tci_upload" accept=".pdf" aria-label="อัปโหลดหลักฐานจากฐานข้อมูล TCI">
                     </div>
                     <div class="checkbox-group file-upload-group">
-                        <input type="checkbox" name="evidence_editorial_board_check" value="true">
-                        <label>7.6 รายชื่อกองบรรณาธิการ (Editorial board) ของบทความวิจัยและบทความวิชาการฯ</label>
-                        <input type="file" name="evidence_editorial_board_upload" accept=".pdf">
+                        <input type="checkbox" id="evidence_editorial_board_check" name="evidence_editorial_board_check" value="true">
+                        <label for="evidence_editorial_board_check">7.6 รายชื่อกองบรรณาธิการ (Editorial board) ของบทความวิจัยและบทความวิชาการฯ</label>
+                        <input type="file" name="evidence_editorial_board_upload" accept=".pdf" aria-label="อัปโหลดรายชื่อกองบรรณาธิการ">
                     </div>
                     <div class="checkbox-group file-upload-group">
-                        <input type="checkbox" name="evidence_exhibition_check" value="true">
-                        <label>7.7 สูจิบัตรหรือสำเนาการจัดนิทรรศการ หรือการแสดงผลงาน กรณีงานสร้างสรรค์ทีเผยแพร่</label>
-                        <input type="file" name="evidence_exhibition_upload" accept=".pdf">
+                        <input type="checkbox" id="evidence_exhibition_check" name="evidence_exhibition_check" value="true">
+                        <label for="evidence_exhibition_check">7.7 สูจิบัตรหรือสำเนาการจัดนิทรรศการ หรือการแสดงผลงาน กรณีงานสร้างสรรค์ทีเผยแพร่</label>
+                        <input type="file" name="evidence_exhibition_upload" accept=".pdf" aria-label="อัปโหลดสูจิบัตรหรือหลักฐานการจัดนิทรรศการ">
                     </div>
                     <div class="checkbox-group file-upload-group">
-                        <input type="checkbox" name="evidence_proof_check" value="true">
-                        <label>7.8 หลักฐานของผลงานที่นำไปเผยแพร่ เช่น รูปเล่มรายงาน, รูปถ่าย เป็นต้น</label>
-                        <input type="file" name="evidence_proof_upload" accept=".pdf,.jpg,.jpeg,.png">
+                        <input type="checkbox" id="evidence_proof_check" name="evidence_proof_check" value="true">
+                        <label for="evidence_proof_check">7.8 หลักฐานของผลงานที่นำไปเผยแพร่ เช่น รูปเล่มรายงาน, รูปถ่าย เป็นต้น</label>
+                        <input type="file" name="evidence_proof_upload" accept=".pdf,.jpg,.jpeg,.png" aria-label="อัปโหลดหลักฐานผลงานที่นำไปเผยแพร่">
                     </div>
                     <div class="checkbox-group file-upload-group">
-                        <input type="checkbox" name="evidence_nrms_check" value="true">
-                        <label>7.9 เอกสารแสดงการส่งเล่มรายงานฉบับสมบูรณ์และปิดโครงการในระบบ NRMS หรือ DRMS</label>
-                        <input type="file" name="evidence_nrms_upload" accept=".pdf">
+                        <input type="checkbox" id="evidence_nrms_check" name="evidence_nrms_check" value="true">
+                        <label for="evidence_nrms_check">7.9 เอกสารแสดงการส่งเล่มรายงานฉบับสมบูรณ์และปิดโครงการในระบบ NRMS หรือ DRMS</label>
+                        <input type="file" name="evidence_nrms_upload" accept=".pdf" aria-label="อัปโหลดเอกสารปิดโครงการในระบบ NRMS หรือ DRMS">
                     </div>
                     <div class="checkbox-group file-upload-group">
-                        <input type="checkbox" name="evidence_other_check" value="true">
-                        <label>7.10 เอกสารอื่นๆตามที่สถาบันวิจัยและพัฒนากำหนด</label>
-                        <input type="file" name="evidence_other_upload" accept=".pdf">
+                        <input type="checkbox" id="evidence_other_check" name="evidence_other_check" value="true">
+                        <label for="evidence_other_check">7.10 เอกสารอื่นๆตามที่สถาบันวิจัยและพัฒนากำหนด</label>
+                        <input type="file" name="evidence_other_upload" accept=".pdf" aria-label="อัปโหลดเอกสารอื่นๆ">
                     </div>
                 </fieldset>
             <hr class="section-divider">
@@ -414,7 +425,7 @@
         function toggleOtherPosition() {
             const select = document.getElementById('academicPosition');
             const otherInput = document.getElementById('academicPositionOther');
-            
+
             if (select.value === 'อื่นๆ') {
                 otherInput.style.display = 'block';
                 otherInput.setAttribute('required', 'required');
@@ -429,7 +440,7 @@
         function toggleOtherAffiliation() {
             const select = document.getElementById('affiliation');
             const otherInput = document.getElementById('affiliationOther');
-            
+
             if (select.value === 'อื่นๆ') {
                 otherInput.style.display = 'block';
                 otherInput.setAttribute('required', 'required');
@@ -445,7 +456,7 @@
     <div id="popup-container" class="popup-container">
         <div class="popup-content">
             <span id="popup-close" class="popup-close">&times;</span>
-            <h2 id="popup-title"></h2>
+            <h2 id="popup-title">แจ้งเตือน</h2>
             <p id="popup-message"></p>
             <p id="popup-feedback" style="display: none; margin-top: 12px;">
                 กรุณากรอกความคิดเห็นต่อแบบฟอร์ม:
@@ -466,6 +477,6 @@
                 <button type="submit" class="submit-btn">Login</button>
             </form>
         </div>
-    </div>    
+    </div>
     </body>
 </html>

@@ -2,6 +2,7 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>การตั้งค่าระบบ</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
@@ -19,6 +20,14 @@
                 <a href="{{ url_for('logout') }}" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
             </div>
         </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
         
         <fieldset>
             <legend>ส่วนที่ 1: ตั้งค่าหัวข้อแบบฟอร์ม</legend>
@@ -133,6 +142,45 @@
                 </button>
             </form>
         </fieldset>
+
+        <fieldset style="margin-top: 20px;">
+            <legend>ส่วนที่ 4: เปลี่ยนรหัสผ่านแอดมิน</legend>
+            <form method="post" autocomplete="off">
+                <input type="hidden" name="setting_type" value="admin_password">
+                <div class="form-group">
+                    <label for="current_password">รหัสผ่านปัจจุบัน:</label>
+                    <input type="password" id="current_password" name="current_password" required minlength="8">
+                </div>
+                <div class="form-group">
+                    <label for="new_password">รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร):</label>
+                    <input type="password" id="new_password" name="new_password" required minlength="8">
+                </div>
+                <div class="form-group">
+                    <label for="confirm_new_password">ยืนยันรหัสผ่านใหม่:</label>
+                    <input type="password" id="confirm_new_password" name="confirm_new_password" required minlength="8">
+                </div>
+                <button type="submit" class="submit-btn">
+                    <i class="fas fa-key"></i> เปลี่ยนรหัสผ่าน
+                </button>
+            </form>
+        </fieldset>
     </div>
+<script>
+// Auto-inject CSRF token into all POST forms
+document.addEventListener('DOMContentLoaded', function() {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (csrfToken) {
+        document.querySelectorAll('form[method="post"]').forEach(function(form) {
+            if (!form.querySelector('input[name="csrf_token"]')) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'csrf_token';
+                input.value = csrfToken;
+                form.appendChild(input);
+            }
+        });
+    }
+});
+</script>
 </body>
 </html>

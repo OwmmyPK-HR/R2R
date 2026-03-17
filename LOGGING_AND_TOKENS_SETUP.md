@@ -91,6 +91,9 @@ CREATE TABLE tokens (
   - `GET /api/tokens` - ดึง tokens
   - `DELETE /api/tokens/<id>` - ยกเลิก token
   - `POST /api/tokens/cleanup` - ลบ expired tokens
+- **Rate limiting** บนทุก endpoint ข้างต้น
+- **Admin session check** (`admin_logged_in`) สำหรับ API ทุกตัว
+- **CSRF protection** สำหรับ endpoint ที่เปลี่ยนข้อมูล (`DELETE`, `POST`)
 
 ### 2. **db/schema.sql** (SQLite)
 เพิ่มตาราง logs และ tokens พร้อม indexes
@@ -176,7 +179,8 @@ curl -X GET "http://localhost:5000/api/tokens" \
 ### ยกเลิก Token
 ```bash
 curl -X DELETE "http://localhost:5000/api/tokens/1" \
-  -H "Cookie: session=..."
+  -H "Cookie: session=..." \
+  -H "X-CSRFToken: <csrf_token>"
 ```
 
 ---
@@ -219,6 +223,9 @@ curl -X DELETE "http://localhost:5000/api/tokens/1" \
 4. ✅ User Agent logging
 5. ✅ Token expiration
 6. ✅ Last used timestamp
+7. ✅ API rate limiting
+8. ✅ Admin session authorization
+9. ✅ CSRF protection สำหรับ API ที่มีการแก้ไขข้อมูล
 
 ---
 

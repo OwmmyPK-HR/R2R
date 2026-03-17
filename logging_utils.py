@@ -57,9 +57,8 @@ class SystemLogger:
                 details=details
             )
             
-            with app.app_context():
-                db.session.add(log_entry)
-                db.session.commit()
+            db.session.add(log_entry)
+            db.session.commit()
                 
             # พิมพ์ลงหน้าจอด้วย
             timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')

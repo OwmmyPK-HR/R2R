@@ -740,7 +740,7 @@ input[type="checkbox"], input[type="radio"] {
 .input-line {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 1rem;
     padding-left: 20px; /* ย่อหน้าเข้ามาให้สวยงาม */
     width: 65%;
     box-sizing: border-box;
@@ -750,12 +750,32 @@ input[type="checkbox"], input[type="radio"] {
     font-weight: normal;
     margin-bottom: 0;
     flex-shrink: 0;
+    margin-right: 0.5rem;
+}
+
+.input-line .nowrap-text {
+    white-space: nowrap;
 }
 
 /* คลาสที่ทำให้ช่องกรอกสั้นลง */
 .inline-input {
     width: 50px;
 }
+
+/* Make this field wide enough to display the full placeholder text. */
+#charge_int_amount {
+    width: 56ch;
+    max-width: 100%;
+}
+
+.charge-int-line {
+    width: 100%;
+}
+
+.charge-int-line #charge_int_amount {
+    min-width: 34ch;
+}
+
 .inline-input-small {
     width: 50px;
 }
@@ -766,8 +786,49 @@ input[type="checkbox"], input[type="radio"] {
     flex-shrink: 0 !important;
 }
 
+/* Keep formula blocks on a single horizontal line. */
+.formula-container {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    overflow-x: auto;
+}
+
+.formula-item {
+    flex: 0 0 auto;
+}
+
+.formula-operator {
+    flex: 0 0 auto;
+    font-size: 1.2rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.formula-input {
+    min-width: 220px;
+}
+
+.formula-container.with-result-below {
+    flex-wrap: wrap;
+}
+
+.formula-container.with-result-below .formula-break {
+    flex-basis: 100%;
+    width: 100%;
+    height: 0;
+}
+
 #int_42_selected_amount {
-    width: 150px !important;
+    width: 56ch !important;
+    max-width: 100%;
+}
+
+#int_42_actual_used_amount {
+    width: 20ch !important;
+    min-width: 20ch !important;
+    max-width: 100%;
 }
 
 #int_41_selected_amount {
@@ -855,7 +916,7 @@ input[type="checkbox"], input[type="radio"] {
     flex-shrink: 0 !important;
 }
 
-/* ขยายเฉพาะช่องที่ใช้ข้อความ placeholder "จำนวนสถาบันทั้งหมด" */
+/* ขยายเฉพาะช่องที่ใช้ข้อความ placeholder "จำนวนสถาบัน" */
 #share_int_num_institutes,
 #special_nat_share_num_institutes,
 #special_int_share_num_institutes,

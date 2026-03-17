@@ -44,7 +44,7 @@
 - [ ] ทดสอบระบบใน local environment สำเร็จ
 - [ ] มี PostgreSQL database พร้อม (สำหรับ production)
 - [ ] เตรียม SECRET_KEY สำหรับ production
-- [ ] เปลี่ยนรหัสผ่าน Admin ในโค้ด
+- [ ] ตั้งค่า `ADMIN_PASSWORD` ใน Environment Variables (ห้ามใช้ค่า default)
 - [ ] ตรวจสอบไฟล์ที่จำเป็น: `Procfile`, `requirements.txt`, `runtime.txt`
 
 ### 🔧 สร้าง SECRET_KEY ใหม่
@@ -88,6 +88,44 @@ openssl rand -hex 32
 - **ค่าที่ใช้**: `0` (ปิด - สำหรับ production) หรือ `1` (เปิด - สำหรับ dev)
 - **ค่าเริ่มต้น**: 0
 
+#### 5. **ADMIN_PASSWORD** (แนะนำอย่างยิ่ง)
+- **คำอธิบาย**: รหัสผ่านตั้งต้นสำหรับผู้ดูแลระบบ
+- **ค่าที่ใช้**: ตั้งเป็นรหัสผ่านใหม่ที่คาดเดายาก (อย่างน้อย 12 ตัวอักษร)
+- ⚠️ **สำคัญ**: ใน production หากไม่ตั้งค่า หรือใช้ค่า default ระบบจะไม่ยอมเริ่มทำงาน
+- **หมายเหตุ**: หลังระบบ hash รหัสผ่านลงฐานข้อมูลแล้ว การเปลี่ยนค่า env อย่างเดียวจะไม่อัปเดตรหัสผ่านที่ใช้งานอยู่
+
+#### 6. **SESSION_COOKIE_SECURE** (แนะนำอย่างยิ่ง)
+- **คำอธิบาย**: บังคับให้ session cookie ส่งผ่าน HTTPS เท่านั้น
+- **ค่าที่ใช้**: `1` สำหรับ production ที่มี HTTPS
+
+#### 7. **SESSION_COOKIE_HTTPONLY** (แนะนำ)
+- **คำอธิบาย**: ป้องกัน JavaScript ฝั่ง browser ไม่ให้เข้าถึง session cookie
+- **ค่าที่ใช้**: `1`
+
+#### 8. **SESSION_COOKIE_SAMESITE** (แนะนำ)
+- **คำอธิบาย**: จำกัดการส่ง cookie ข้ามไซต์เพื่อลด CSRF risk
+- **ค่าที่ใช้**: `Lax` หรือ `Strict` ตาม flow ที่ต้องการ
+
+#### 9. **PREFERRED_URL_SCHEME** (แนะนำ)
+- **คำอธิบาย**: กำหนด scheme หลักของ URL ที่ระบบสร้าง
+- **ค่าที่ใช้**: `https`
+
+#### 10. **USE_PROXY_FIX** (ใช้เมื่ออยู่หลัง reverse proxy)
+- **คำอธิบาย**: ให้ Flask เคารพ `X-Forwarded-*` headers จาก Nginx, Caddy, Load Balancer หรือ platform proxy
+- **ค่าที่ใช้**: `1`
+
+#### 11. **SESSION_LIFETIME_MINUTES** (แนะนำ)
+- **คำอธิบาย**: กำหนดอายุ session ของ admin
+- **ค่าที่ใช้**: เช่น `480` (8 ชั่วโมง)
+
+#### 12. **LIMITER_STORAGE_URI** (แนะนำอย่างยิ่ง)
+- **คำอธิบาย**: backend storage ของ rate limiter
+- **ค่าที่ใช้**: `memory://` (single worker) หรือ `redis://host:6379` (multi-worker)
+
+#### 13. **WEB_CONCURRENCY** (แนะนำ)
+- **คำอธิบาย**: จำนวน Gunicorn workers
+- **ค่าที่ใช้**: `1` เมื่อใช้ `LIMITER_STORAGE_URI=memory://`
+
 ### 📄 ตัวอย่างไฟล์ .env (สำหรับ VPS/Server เอง)
 
 ```bash
@@ -95,13 +133,31 @@ openssl rand -hex 32
 SECRET_KEY=a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456
 FLASK_ENV=production
 FLASK_DEBUG=0
+APP_ENV=production
+FLASK_HOST=0.0.0.0
+PORT=8000
+
+# Reverse proxy / HTTPS
+USE_PROXY_FIX=1
+PREFERRED_URL_SCHEME=https
+SESSION_COOKIE_SECURE=1
+SESSION_COOKIE_HTTPONLY=1
+SESSION_COOKIE_SAMESITE=Lax
 
 # Database Configuration
 DATABASE_URL=postgresql://r2r_user:YourSecurePassword@localhost:5432/r2r_production
 
+# Admin Configuration
+ADMIN_PASSWORD=change-this-admin-password
+
 # Application Settings
 MAX_CONTENT_LENGTH=16777216
 UPLOAD_FOLDER=uploads
+SESSION_LIFETIME_MINUTES=480
+
+# Rate Limiter
+LIMITER_STORAGE_URI=memory://
+WEB_CONCURRENCY=1
 ```
 
 ---
@@ -158,17 +214,15 @@ GRANT ALL PRIVILEGES ON DATABASE r2r_production TO r2r_user;
 
 ### 🔄 Initialize Database
 
-หลังจาก Deploy แล้ว ให้รันคำสั่งสร้างตาราง:
+โปรเจคปัจจุบันตั้งค่าให้เริ่มฐานข้อมูลอัตโนมัติแล้ว:
+
+- ใช้ `release: python migrate_database.py` ใน `Procfile`
+- และมี `_run_auto_migration()` ในแอปเพื่อช่วยเพิ่มคอลัมน์ที่ขาดเมื่อเริ่มระบบ
+
+กรณีต้องการ initialize/manual เพิ่มเติม สามารถรันได้:
 
 ```bash
-# วิธีที่ 1: ใช้ init_db.py script
 python db/init_db.py
-
-# วิธีที่ 2: ใช้ Python shell
-python
->>> from app import app, db
->>> with app.app_context():
-...     db.create_all()
 ```
 
 ---
@@ -222,6 +276,9 @@ heroku config:set SECRET_KEY=$(python -c "import secrets; print(secrets.token_he
 # ตั้งค่า FLASK_ENV
 heroku config:set FLASK_ENV=production
 
+# ตั้งค่าเพิ่มเติมให้ตรงโปรเจคปัจจุบัน
+heroku config:set APP_ENV=production SESSION_LIFETIME_MINUTES=480 LIMITER_STORAGE_URI=memory:// WEB_CONCURRENCY=1
+
 # ตรวจสอบ config ทั้งหมด
 heroku config
 ```
@@ -241,15 +298,11 @@ git push heroku master
 
 ### 🟣 ขั้นตอนที่ 6: สร้าง Database Tables
 
-```bash
-# เข้าสู่ console
-heroku run python
->>> from app import app, db
->>> with app.app_context():
-...     db.create_all()
->>> exit()
+โดยปกติ Heroku จะรัน `release` command ใน `Procfile` ให้อัตโนมัติ (`python migrate_database.py`)
 
-# หรือใช้ script
+หากต้องการสั่งเองเพิ่มเติม:
+
+```bash
 heroku run python db/init_db.py
 ```
 
@@ -336,6 +389,10 @@ git push -u origin main
 3. เพิ่ม variables:
    - `SECRET_KEY`: [คีย์ที่สร้างใหม่]
    - `FLASK_ENV`: `production`
+    - `APP_ENV`: `production`
+    - `SESSION_LIFETIME_MINUTES`: `480`
+    - `LIMITER_STORAGE_URI`: `memory://`
+    - `WEB_CONCURRENCY`: `1`
    - **DATABASE_URL จะถูกเพิ่มอัตโนมัติ**
 
 ### 🚂 ขั้นตอนที่ 6: สร้าง Database Tables
@@ -357,9 +414,11 @@ railway login
 # Link กับ project
 railway link
 
-# Run command
+# Run command (ถ้าต้องการสั่งเอง)
 railway run python db/init_db.py
 ```
+
+หมายเหตุ: ถ้า Railway รองรับ `release` command จาก `Procfile` จะรัน `python migrate_database.py` ให้อัตโนมัติ
 
 ### 🚂 ขั้นตอนที่ 7: เปิดเว็บไซต์
 
@@ -400,7 +459,7 @@ railway run python db/init_db.py
    - **Branch**: `main`
    - **Runtime**: `Python 3`
    - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `gunicorn wsgi:app`
+    - **Start Command**: `gunicorn wsgi:app --workers ${WEB_CONCURRENCY:-1} --timeout 120 --bind 0.0.0.0:${PORT:-8000}`
 
 ### 🎨 ขั้นตอนที่ 4: ตั้งค่า Environment Variables
 
@@ -410,6 +469,10 @@ railway run python db/init_db.py
 SECRET_KEY=[คีย์ที่สร้างใหม่]
 DATABASE_URL=[Internal Database URL จากขั้นตอนที่ 2]
 FLASK_ENV=production
+APP_ENV=production
+SESSION_LIFETIME_MINUTES=480
+LIMITER_STORAGE_URI=memory://
+WEB_CONCURRENCY=1
 ```
 
 ### 🎨 ขั้นตอนที่ 5: Deploy
@@ -427,6 +490,8 @@ FLASK_ENV=production
 ```bash
 python db/init_db.py
 ```
+
+หมายเหตุ: หาก Render รัน `release` command จาก `Procfile` ได้ ระบบจะ migrate ให้อัตโนมัติอยู่แล้ว
 
 ### 🎨 ขั้นตอนที่ 7: เข้าถึงเว็บไซต์
 
@@ -517,7 +582,12 @@ nano .env
 SECRET_KEY=your-generated-secret-key-here
 DATABASE_URL=postgresql://r2r_user:YourSecurePassword123!@localhost:5432/r2r_production
 FLASK_ENV=production
+APP_ENV=production
 FLASK_DEBUG=0
+ADMIN_PASSWORD=change-this-admin-password
+SESSION_LIFETIME_MINUTES=480
+LIMITER_STORAGE_URI=memory://
+WEB_CONCURRENCY=1
 
 # บันทึก (Ctrl+X, Y, Enter)
 
@@ -556,7 +626,7 @@ nano /etc/supervisor/conf.d/r2r.conf
 ```ini
 [program:r2r]
 directory=/home/r2rapp/r2r-system
-command=/home/r2rapp/r2r-system/venv/bin/gunicorn --workers 3 --bind 0.0.0.0:8000 wsgi:app
+command=/home/r2rapp/r2r-system/venv/bin/gunicorn --workers 1 --timeout 120 --bind 0.0.0.0:8000 wsgi:app
 user=r2rapp
 autostart=true
 autorestart=true
@@ -705,44 +775,12 @@ supervisorctl restart r2r
 
 ### 🔄 เมื่อมีการเปลี่ยนแปลง Schema
 
-#### วิธีที่ 1: ใช้ Flask-Migrate (แนะนำ)
+โปรเจคปัจจุบันใช้แนวทาง migration แบบ script/manual เป็นหลัก (`migrate_database.py` + auto migration ในแอป)
 
-**ติดตั้ง Flask-Migrate**:
-
-```bash
-# เพิ่มใน requirements.txt
-Flask-Migrate==4.0.5
-
-# ติดตั้ง
-pip install Flask-Migrate
-```
-
-**แก้ไข app.py** เพิ่ม:
-
-```python
-from flask_migrate import Migrate
-
-# หลังจากสร้าง db
-migrate = Migrate(app, db)
-```
-
-**ใช้งาน Migration**:
+#### วิธีที่ 1: ใช้สคริปต์ที่มีอยู่แล้ว
 
 ```bash
-# สร้าง migrations folder (ครั้งแรก)
-flask db init
-
-# สร้าง migration script
-flask db migrate -m "Add new column"
-
-# ตรวจสอบ script ที่สร้าง
-# (ดูใน migrations/versions/)
-
-# Apply migration
-flask db upgrade
-
-# Rollback (ถ้าจำเป็น)
-flask db downgrade
+python migrate_database.py
 ```
 
 #### วิธีที่ 2: Manual Migration
@@ -796,24 +834,14 @@ cp instance/database.db instance/database_backup.db
 - [ ] ทดสอบการอัปโหลดไฟล์
 - [ ] ทดสอบการสร้าง PDF
 - [ ] ตรวจสอบ logs ไม่มี error
-- [ ] เปลี่ยนรหัสผ่าน Admin
+- [ ] เปลี่ยนรหัสผ่าน Admin ผ่านหน้า Admin Settings (ถ้าต้องการหมุนรหัส)
 - [ ] ตั้งค่า backup อัตโนมัติ
 - [ ] ตั้งค่า monitoring
 - [ ] เพิ่ม custom domain (ถ้ามี)
 
 ### 🔐 เปลี่ยนรหัสผ่าน Admin
 
-แก้ไขในไฟล์ `app.py`:
-
-```python
-# แทนที่
-ADMIN_PASSWORD = "Publication_IRD"
-
-# เป็นรหัสผ่านที่แข็งแกร่ง
-ADMIN_PASSWORD = "Your_Strong_Password_Here_2024!"
-```
-
-**หรือใช้ Environment Variable** (แนะนำ):
+ตั้งค่าเริ่มต้นผ่าน Environment Variable (แนะนำ):
 
 ```python
 # ในไฟล์ app.py
@@ -823,6 +851,8 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'Publication_IRD')
 heroku config:set ADMIN_PASSWORD=YourStrongPassword
 railway variables set ADMIN_PASSWORD=YourStrongPassword
 ```
+
+หลังจากระบบเริ่มใช้งานแล้ว สามารถเปลี่ยนรหัสผ่านได้จากหน้า `Admin Settings` โดยไม่ต้องแก้โค้ด
 
 ### 📧 ตั้งค่าการแจ้งเตือน (Optional)
 
@@ -939,11 +969,10 @@ sudo chown -R r2rapp:r2rapp /home/r2rapp/r2r-system/uploads
 #### ปัญหา: Memory Exceeded
 
 ```bash
-# ลด number of workers
-# Procfile:
-web: gunicorn --workers 2 wsgi:app
-
-# หรือ upgrade plan
+# ถ้าใช้ LIMITER_STORAGE_URI=memory:// ให้ WEB_CONCURRENCY=1
+# ถ้าต้องการหลาย worker ให้เปลี่ยนเป็น Redis ก่อน
+LIMITER_STORAGE_URI=redis://your-redis-host:6379
+WEB_CONCURRENCY=2
 ```
 
 ### 📊 Monitoring และ Logging
@@ -989,6 +1018,8 @@ if not app.debug:
 - [ ] ✅ Validate ข้อมูล input ทั้งหมด
 - [ ] ✅ จำกัดขนาดไฟล์อัปโหลด
 - [ ] ✅ ตรวจสอบประเภทไฟล์ที่อัปโหลด
+- [ ] ✅ ตั้งค่า `SESSION_LIFETIME_MINUTES` ให้เหมาะกับนโยบายองค์กร
+- [ ] ✅ ถ้าต้องการ multi-worker ให้ใช้ Redis กับ Rate Limiter
 - [ ] ✅ เปิด firewall บน VPS
 - [ ] ✅ Update packages เป็นประจำ
 
@@ -1000,9 +1031,23 @@ if not app.debug:
 @app.after_request
 def set_security_headers(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
-    response.headers['X-XSS-Protection'] = '1; mode=block'
-    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "img-src 'self' data:; "
+        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+        "script-src 'self' 'unsafe-inline'; "
+        "font-src 'self' data: https://cdnjs.cloudflare.com; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "frame-ancestors 'none'; "
+        "form-action 'self'"
+    )
+    # ควรตั้งค่าเฉพาะเมื่อ request มาผ่าน HTTPS
+    if request.is_secure:
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     return response
 ```
 
