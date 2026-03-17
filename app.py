@@ -1,4 +1,5 @@
 import os
+import traceback
 from io import BytesIO
 from datetime import datetime
 from datetime import timedelta
@@ -466,6 +467,9 @@ class PDF(FPDF):
 def index():
     if request.method == 'POST':
         try:
+            # Re-check schema on submit to avoid stale DB structure causing generic save failures.
+            _run_auto_migration()
+
             def normalize_capped_amount(raw_value, max_amount=9999999):
                 if raw_value is None:
                     return None
@@ -603,10 +607,16 @@ def index():
 
         except Exception as e:
             db.session.rollback()
-            print(f"Error: {e}")
+            print(f"Error while saving submission: {e}")
+            traceback.print_exc()
+
+            error_message = 'เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง'
+            if not _is_production:
+                error_message = f'เกิดข้อผิดพลาดในการบันทึกข้อมูล: {e}'
+
             return jsonify({
                 'status': 'error',
-                'message': 'เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง'
+                'message': error_message
             }), 500
 
     # สำหรับ request แบบ GET ให้แสดงหน้าฟอร์มปกติ
